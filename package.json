@@ -1,0 +1,23 @@
+{
+  "name": "rick",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TTS streaming system with WebSocket delivery and chunk-based queue",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -p \"{name}\" -c \"cyan,magenta\" \"npm:dev:bridge\" \"npm:dev:client\"",
+    "dev:bridge": "npm -w apps/bridge run dev",
+    "dev:client": "npm -w apps/node-client run dev",
+    "build": "npm -w apps/bridge run build && npm -w apps/node-client run build",
+    "build:bridge": "npm -w apps/bridge run build",
+    "build:client": "npm -w apps/node-client run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
