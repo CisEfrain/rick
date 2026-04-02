@@ -29,15 +29,20 @@ const ws = new ReconnectingWebSocket({
     try {
       const msg = JSON.parse(data.toString()) as Record<string, unknown>;
       if (msg.type === 'audio.start') {
-        console.log('\n🔊 [Rick está hablando...]');
+        if (!player.isPlaying) console.log('\n🔊 [Rick está hablando...]');
         if (MUTE_MIC_WHILE_SPEAKING) recorder.stopRecording();
         player.onAudioStart('utt-agent', 'corr-agent', 0);
       }
       if (msg.type === 'audio.end') {
-        console.log('⏹ [Rick terminó de hablar]\n');
         player.onAudioEnd('utt-agent', 'corr-agent', 0);
+        // Re-enable mic after drain delay + extra margin
         if (MUTE_MIC_WHILE_SPEAKING) {
-          setTimeout(() => recorder.startRecording(), PLAYBACK_DONE_DELAY_MS);
+          setTimeout(() => {
+            if (!player.isPlaying) {
+              console.log('⏹ [Rick terminó de hablar]\n');
+              recorder.startRecording();
+            }
+          }, PLAYBACK_DONE_DELAY_MS + 1000);
         }
       }
     } catch {

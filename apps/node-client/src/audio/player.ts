@@ -10,11 +10,14 @@ interface AudioStream {
   proc: ChildProcess;
 }
 
+const DRAIN_DELAY_MS = parseInt(process.env.AUDIO_DRAIN_DELAY_MS || '800', 10);
+
 export class AudioPlayer {
   private currentStream: AudioStream | null = null;
   private ws: ReconnectingWebSocket | null = null;
   private _isPlaying = false;
   private sessionId: string;
+  private drainTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -42,6 +45,11 @@ export class AudioPlayer {
   }
 
   onAudioStart(utteranceId: string, correlationId: string, chunkIndex: number): void {
+    // Cancel pending drain — a new utterance continues on the same aplay process
+    if (this.drainTimer) {
+      clearTimeout(this.drainTimer);
+      this.drainTimer = null;
+    }
     if (this.currentStream) return; // already started by first chunk
     this._startStream(utteranceId, correlationId, chunkIndex);
   }
@@ -75,16 +83,22 @@ export class AudioPlayer {
   onAudioEnd(utteranceId: string, correlationId: string, chunkIndex: number): void {
     if (!this.currentStream) return;
 
-    logger.info('player.completed', { sessionId: this.sessionId, utteranceId, correlationId, chunkIndex });
-    const proc = this.currentStream.proc;
-    this.currentStream = null;
-    this._isPlaying = false;
-    // Close stdin so aplay/SoX drains its buffer, then force kill as safety net
-    try { proc.stdin?.end(); } catch { /* ignore */ }
-    proc.on('close', () => { /* natural exit after drain */ });
-    setTimeout(() => {
-      try { proc.kill(); } catch { /* ignore */ }
-    }, 15000);
+    logger.info('player.utterance_done', { sessionId: this.sessionId, utteranceId, correlationId, chunkIndex });
+
+    // Delay closing the player — if another utterance arrives quickly, we reuse the same process
+    this.drainTimer = setTimeout(() => {
+      this.drainTimer = null;
+      if (!this.currentStream) return;
+      logger.info('player.completed', { sessionId: this.sessionId, utteranceId, correlationId, chunkIndex });
+      const proc = this.currentStream.proc;
+      this.currentStream = null;
+      this._isPlaying = false;
+      try { proc.stdin?.end(); } catch { /* ignore */ }
+      proc.on('close', () => { /* natural exit after drain */ });
+      setTimeout(() => {
+        try { proc.kill(); } catch { /* ignore */ }
+      }, 15000);
+    }, DRAIN_DELAY_MS);
   }
 
   onAudioError(utteranceId: string, correlationId: string, chunkIndex: number, message: string): void {
