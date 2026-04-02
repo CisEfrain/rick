@@ -4,19 +4,23 @@ import { logger } from '../common/logger.js';
 import { config, getDeepgramAgentConfig } from '../config/deepgramConfig.js';
 import { executeN8nTool } from '../tools/n8nClient.js';
 
+const IDLE_TIMEOUT_MS = parseInt(process.env.DG_IDLE_TIMEOUT_MS || '120000', 10); // 2 min default
+
 export class DeepgramSession {
   private sessionId: string;
   private clientWs: WebSocket;
   private dgConnection: any = null;
   private isAlive = true;
+  private dgConnected = false;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(sessionId: string, clientWs: WebSocket) {
     this.sessionId = sessionId;
     this.clientWs = clientWs;
-    this.connect();
+    this.connectDg();
   }
 
-  private connect() {
+  private connectDg() {
     if (!config.deepgramApiKey) {
       logger.error('dg.no_api_key', { sessionId: this.sessionId });
       return;
@@ -33,15 +37,15 @@ export class DeepgramSession {
       return;
     }
 
-    logger.info('dg.registering_handlers', { sessionId: this.sessionId });
-
     this.dgConnection.on(AgentEvents.Open, () => {
       if (!this.isAlive) {
         this.dgConnection?.disconnect();
         return;
       }
       logger.info('dg.connected', { sessionId: this.sessionId });
+      this.dgConnected = true;
       this.dgConnection.configure(getDeepgramAgentConfig());
+      this.resetIdleTimer();
     });
 
     this.dgConnection.on(AgentEvents.SettingsApplied, () => {
@@ -49,6 +53,7 @@ export class DeepgramSession {
     });
 
     this.dgConnection.on(AgentEvents.Audio, (audio: any) => {
+      this.resetIdleTimer();
       this.forwardToClient(Buffer.isBuffer(audio) ? audio : Buffer.from(audio));
     });
 
@@ -99,7 +104,8 @@ export class DeepgramSession {
 
     this.dgConnection.on(AgentEvents.Close, () => {
       logger.info('dg.disconnected', { sessionId: this.sessionId });
-      this.isAlive = false;
+      this.dgConnected = false;
+      this.dgConnection = null;
     });
 
     this.dgConnection.on(AgentEvents.Error, (err: any) => {
@@ -107,9 +113,36 @@ export class DeepgramSession {
     });
   }
 
+  private resetIdleTimer() {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      if (this.dgConnected && this.dgConnection) {
+        logger.info('dg.idle_disconnect', { sessionId: this.sessionId, timeoutMs: IDLE_TIMEOUT_MS });
+        this.disconnectDg();
+      }
+    }, IDLE_TIMEOUT_MS);
+  }
+
+  private disconnectDg() {
+    this.dgConnected = false;
+    try {
+      this.dgConnection?.disconnect();
+    } catch { /* ignore */ }
+    this.dgConnection = null;
+  }
+
   public sendAudio(buffer: Buffer) {
-    if (!this.isAlive || !this.dgConnection) return;
+    // Reconnect to Deepgram if session was closed due to idle
+    if (!this.dgConnection && this.isAlive) {
+      logger.info('dg.wake_up', { sessionId: this.sessionId });
+      this.connectDg();
+      return; // drop this chunk — DG is not ready yet
+    }
+
+    if (!this.dgConnected || !this.dgConnection) return;
     if (this.dgConnection.getReadyState() !== 1 /* OPEN */) return;
+
+    this.resetIdleTimer();
     this.dgConnection.send(buffer);
   }
 
@@ -127,10 +160,7 @@ export class DeepgramSession {
 
   public close() {
     this.isAlive = false;
-    try {
-      this.dgConnection?.disconnect();
-    } catch (e) {
-      // ignore
-    }
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.disconnectDg();
   }
 }
