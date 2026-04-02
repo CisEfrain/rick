@@ -17,6 +17,11 @@ export function setupClientHub(wss: WebSocketServer) {
 
     logger.info('client.connected', { sessionId });
 
+    // Keep connection alive through Railway/proxies
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.ping();
+    }, 25000);
+
     // Initialize the Deepgram Voice Agent session for this client
     const dgSession = new DeepgramSession(sessionId, ws);
 
@@ -38,6 +43,7 @@ export function setupClientHub(wss: WebSocketServer) {
     });
 
     ws.on('close', () => {
+      clearInterval(pingInterval);
       logger.info('client.disconnected', { sessionId });
       dgSession.close();
     });
