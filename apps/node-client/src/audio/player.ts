@@ -79,11 +79,12 @@ export class AudioPlayer {
     const proc = this.currentStream.proc;
     this.currentStream = null;
     this._isPlaying = false;
-    // Close stdin so SoX drains its buffer, then force kill after drain window
+    // Close stdin so aplay/SoX drains its buffer, then force kill as safety net
     try { proc.stdin?.end(); } catch { /* ignore */ }
+    proc.on('close', () => { /* natural exit after drain */ });
     setTimeout(() => {
       try { proc.kill(); } catch { /* ignore */ }
-    }, 300);
+    }, 15000);
   }
 
   onAudioError(utteranceId: string, correlationId: string, chunkIndex: number, message: string): void {
