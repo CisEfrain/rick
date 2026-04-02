@@ -8,6 +8,8 @@ import * as readline from 'node:readline';
 const SESSION_ID = process.env.SESSION_ID || 'raspi-001';
 const BRIDGE_WS_URL = process.env.BRIDGE_WS_URL || 'ws://localhost:3000';
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || process.env.TOKEN || '';
+const MUTE_MIC_WHILE_SPEAKING = (process.env.MUTE_MIC_WHILE_SPEAKING || 'true').toLowerCase() === 'true';
+const PLAYBACK_DONE_DELAY_MS = parseInt(process.env.PLAYBACK_DONE_DELAY_MS || '500', 10);
 const wsUrl = `${BRIDGE_WS_URL}?sessionId=${SESSION_ID}&token=${INTERNAL_TOKEN}`;
 
 const player = new AudioPlayer(SESSION_ID);
@@ -28,11 +30,15 @@ const ws = new ReconnectingWebSocket({
       const msg = JSON.parse(data.toString()) as Record<string, unknown>;
       if (msg.type === 'audio.start') {
         console.log('\n🔊 [Rick está hablando...]');
+        if (MUTE_MIC_WHILE_SPEAKING) recorder.stopRecording();
         player.onAudioStart('utt-agent', 'corr-agent', 0);
       }
       if (msg.type === 'audio.end') {
         console.log('⏹ [Rick terminó de hablar]\n');
         player.onAudioEnd('utt-agent', 'corr-agent', 0);
+        if (MUTE_MIC_WHILE_SPEAKING) {
+          setTimeout(() => recorder.startRecording(), PLAYBACK_DONE_DELAY_MS);
+        }
       }
     } catch {
       // ignore
