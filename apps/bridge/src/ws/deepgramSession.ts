@@ -107,48 +107,57 @@ export class DeepgramSession {
     });
 
     this.dgConnection.on(AgentEvents.FunctionCallRequest, async (data: any) => {
-      // Debug: log full event structure to understand Deepgram SDK format
-      logger.info('dg.tool_call_raw', { sessionId: this.sessionId, data: JSON.stringify(data), keys: Object.keys(data || {}) });
+      // Deepgram sends { type: "FunctionCallRequest", functions: [{ id, name, arguments }] }
+      const functions = data.functions || [];
 
-      const function_call_id = data.function_call_id ?? data.id ?? data.call_id;
-      const function_name = data.function_name ?? data.name;
-      const input = data.input ?? data.arguments ?? data.parameters;
-      logger.info('dg.tool_call_request', { sessionId: this.sessionId, name: function_name, callId: function_call_id });
+      for (const fn of functions) {
+        const callId = fn.id;
+        const fnName = fn.name;
+        const rawArgs = fn.arguments;
+        logger.info('dg.tool_call_request', { sessionId: this.sessionId, name: fnName, callId });
 
-      try {
-        let result: any;
-        const args = typeof input === 'string' ? JSON.parse(input) : input;
+        try {
+          let result: any;
+          const args = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
 
-        // Handle memory tools locally
-        if (function_name === 'recordar') {
-          saveCoreMemory(this.sessionId, args.key, args.value);
-          result = { status: 'ok', message: `Guardado: ${args.key} = ${args.value}` };
-        } else if (function_name === 'buscar_memoria') {
-          const found = searchArchival(this.sessionId, args.query);
-          result = { result: found };
-        } else {
-          // Forward to n8n for other tools
-          result = await executeN8nTool({
-            toolName: function_name,
-            args,
-            callId: function_call_id,
-            sessionId: this.sessionId,
-          });
+          // Handle memory tools locally
+          if (fnName === 'recordar') {
+            saveCoreMemory(this.sessionId, args.key, args.value);
+            result = { status: 'ok', message: `Guardado: ${args.key} = ${args.value}` };
+          } else if (fnName === 'buscar_memoria') {
+            const found = searchArchival(this.sessionId, args.query);
+            result = { result: found };
+          } else {
+            // Forward to n8n for other tools
+            result = await executeN8nTool({
+              toolName: fnName,
+              args,
+              callId,
+              sessionId: this.sessionId,
+            });
+          }
+
+          // Response must match Deepgram's expected format with functions array
+          this.dgConnection.send(JSON.stringify({
+            type: 'FunctionCallResponse',
+            functions: [{
+              id: callId,
+              name: fnName,
+              output: JSON.stringify(result),
+            }],
+          }));
+          logger.info('dg.tool_call_response_sent', { sessionId: this.sessionId, name: fnName, callId });
+        } catch (e: any) {
+          logger.error('dg.tool_call_error', { sessionId: this.sessionId, callId, name: fnName, message: e.message });
+          this.dgConnection.send(JSON.stringify({
+            type: 'FunctionCallResponse',
+            functions: [{
+              id: callId,
+              name: fnName,
+              output: JSON.stringify({ error: e.message }),
+            }],
+          }));
         }
-
-        this.dgConnection.send(JSON.stringify({
-          type: 'FunctionCallResponse',
-          function_call_id,
-          output: JSON.stringify(result),
-        }));
-        logger.info('dg.tool_call_response_sent', { sessionId: this.sessionId, callId: function_call_id });
-      } catch (e: any) {
-        logger.error('dg.tool_call_error', { sessionId: this.sessionId, callId: function_call_id, message: e.message });
-        this.dgConnection.send(JSON.stringify({
-          type: 'FunctionCallResponse',
-          function_call_id,
-          output: JSON.stringify({ error: e.message }),
-        }));
       }
     });
 
