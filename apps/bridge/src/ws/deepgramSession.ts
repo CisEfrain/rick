@@ -139,7 +139,9 @@ export class DeepgramSession {
 
           const response = {
             type: 'FunctionCallResponse',
-            functions: [{ id: callId, output: JSON.stringify(result) }],
+            id: callId,
+            name: fnName,
+            content: JSON.stringify(result),
           };
           logger.info('dg.tool_call_response', { sessionId: this.sessionId, name: fnName, callId, response: JSON.stringify(response) });
           this.dgConnection.send(JSON.stringify(response));
@@ -147,7 +149,9 @@ export class DeepgramSession {
           logger.error('dg.tool_call_error', { sessionId: this.sessionId, callId, name: fnName, message: e.message });
           this.dgConnection.send(JSON.stringify({
             type: 'FunctionCallResponse',
-            functions: [{ id: callId, output: JSON.stringify({ error: e.message }) }],
+            id: callId,
+            name: fnName,
+            content: JSON.stringify({ error: e.message }),
           }));
         }
       }
