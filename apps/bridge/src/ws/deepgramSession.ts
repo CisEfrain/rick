@@ -137,25 +137,17 @@ export class DeepgramSession {
             });
           }
 
-          // Response must match Deepgram's expected format with functions array
-          this.dgConnection.send(JSON.stringify({
+          const response = {
             type: 'FunctionCallResponse',
-            functions: [{
-              id: callId,
-              name: fnName,
-              output: JSON.stringify(result),
-            }],
-          }));
-          logger.info('dg.tool_call_response_sent', { sessionId: this.sessionId, name: fnName, callId });
+            functions: [{ id: callId, output: JSON.stringify(result) }],
+          };
+          logger.info('dg.tool_call_response', { sessionId: this.sessionId, name: fnName, callId, response: JSON.stringify(response) });
+          this.dgConnection.send(JSON.stringify(response));
         } catch (e: any) {
           logger.error('dg.tool_call_error', { sessionId: this.sessionId, callId, name: fnName, message: e.message });
           this.dgConnection.send(JSON.stringify({
             type: 'FunctionCallResponse',
-            functions: [{
-              id: callId,
-              name: fnName,
-              output: JSON.stringify({ error: e.message }),
-            }],
+            functions: [{ id: callId, output: JSON.stringify({ error: e.message }) }],
           }));
         }
       }
