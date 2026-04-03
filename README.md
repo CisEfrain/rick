@@ -1,94 +1,43 @@
 # Rick — Voice Agent System
 
-Asistente de voz en tiempo real impulsado por **Deepgram Voice Agent**. El micrófono captura audio en el dispositivo (Raspberry Pi o Windows), lo envía al bridge central, que lo procesa con Deepgram y devuelve audio de respuesta al cliente para reproducción por parlantes.
+Asistente de voz en tiempo real con personalidad, memoria persistente y cuerpo fisico. Impulsado por Deepgram Voice Agent (STT + LLM + TTS). Corre en una Raspberry Pi con audio USB y se conecta a un bridge en la nube.
 
 ## Arquitectura
 
-```text
-Usuario (micrófono)
-   ↓  PCM 16kHz raw via WebSocket
-Node Client (Raspberry Pi / Windows)
-   ↓  WebSocket (audio binario)
-Bridge (Node.js / Railway)
-   ↓  WebSocket Voice Agent Session
-Deepgram Voice Agent (STT + LLM + TTS)
-   ↓  FunctionCallRequest (si el agente necesita datos externos)
-Bridge
-   ↓  HTTP Webhook POST
-n8n (ejecuta herramientas y devuelve JSON)
-   ↑  FunctionCallResponse
-Deepgram (continúa la respuesta con el contexto de la herramienta)
-   ↑  Audio PCM binario
-Bridge
-   ↑  WebSocket (audio binario)
-Node Client → Reproducción por parlantes
 ```
-
-## Componentes
-
-- **`apps/bridge`** — Servidor central. Gestiona la sesión WebSocket con Deepgram Voice Agent y la conexión con el cliente. Reenvía audio, maneja eventos del agente y ejecuta herramientas vía n8n. Bloquea el audio del micrófono mientras el agente habla para evitar eco.
-- **`apps/node-client`** — Cliente de dispositivo (Raspberry Pi / Windows). Captura audio del micrófono con SoX (Windows) o arecord (Linux), lo envía al bridge en tiempo real, y reproduce el audio de respuesta por parlantes. Soporta mute automático mientras el agente habla.
-- **`n8n`** — Motor de herramientas externo. Expone un webhook que el bridge invoca cuando Deepgram solicita una función (ej. clima, hora).
-- **`infra/`** — Documentación de despliegue en Railway para el bridge.
+Usuario (microfono)
+   |
+   v
+Node Client (Raspberry Pi)
+   |  WebSocket (audio PCM 16kHz)
+   v
+Bridge (Node.js / Railway)
+   |  WebSocket Voice Agent
+   v
+Deepgram (STT → LLM → TTS)
+   |
+   v
+Bridge → Node Client → Parlante
+```
 
 ## Quick Start
 
-### 1. Instalar dependencias
 ```bash
 npm install
-```
-
-### 2. Configurar variables de entorno
-
-**Bridge** (`apps/bridge/.env`):
-```env
-DEEPGRAM_API_KEY=tu_api_key
-INTERNAL_TOKEN=un_token_secreto
-N8N_TOOL_WEBHOOK_URL=http://localhost:5678/webhook/tool
-AGENT_AUDIO_DONE_DELAY_MS=1500
-```
-
-**Node Client** (`apps/node-client/.env`):
-```env
-SESSION_ID=raspi-001
-BRIDGE_WS_URL=ws://localhost:3000
-TOKEN=un_token_secreto
-AUDIO_BACKEND=sox                # sox (Windows) o arecord (Linux/Raspi)
-SOX_PATH=C:\ruta\a\sox.exe       # solo Windows
-MUTE_MIC_WHILE_SPEAKING=true     # evita eco con parlantes; false con ReSpeaker HAT
-```
-
-### 3. Iniciar servidores de desarrollo
-```bash
+cp apps/bridge/.env.example apps/bridge/.env       # configurar DEEPGRAM_API_KEY, INTERNAL_TOKEN
+cp apps/node-client/.env.example apps/node-client/.env  # configurar BRIDGE_WS_URL, TOKEN
 npm run dev
 ```
 
-### 4. Uso
-El cliente inicia la grabación automáticamente al arrancar. Habla directamente — Deepgram VAD detecta cuando hablás y cuando terminás. Rick responde por audio en los parlantes.
+Para setup completo en Raspberry Pi ver [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md).
 
-| Comando en cliente | Acción |
-|---|---|
-| `!stop` | Interrumpe la reproducción actual |
-| `!quit` | Cierra el cliente |
+## Documentacion
 
-## Scripts
-
-| Comando | Descripción |
-|---|---|
-| `npm run dev` | Inicia bridge + cliente |
-| `npm run dev:bridge` | Solo el bridge |
-| `npm run dev:client` | Solo el cliente |
-| `npm run build` | Compila ambas apps |
-
-## Audio backends
-
-| Plataforma | Backend | Notas |
-|---|---|---|
-| Windows | SoX | Requiere `SOX_PATH` apuntando a `sox.exe` |
-| Raspberry Pi / Linux | arecord | Incluido en ALSA, sin instalación extra |
-
-Para cancelación de eco por hardware se recomienda el **ReSpeaker 2-Mic HAT** o **ReSpeaker Lite USB** — en ese caso setear `MUTE_MIC_WHILE_SPEAKING=false`.
-
-## API Endpoints (Bridge)
-
-- `GET /health` — Health check.
+| Documento | Descripcion |
+|-----------|------------|
+| [docs/functional.md](docs/functional.md) | Que hace Rick, como interactuar, memoria, comandos |
+| [docs/constitution.md](docs/constitution.md) | Principios de diseno, arquitectura, decisiones tecnicas |
+| [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md) | Guia paso a paso para instalar en Raspberry Pi |
+| [docs/hardware.md](docs/hardware.md) | Componentes, conexiones GPIO, cableado |
+| [CLAUDE.md](CLAUDE.md) | Contexto tecnico para Claude Code |
+| [infra/railway/](infra/railway/) | Deploy del bridge en Railway |
