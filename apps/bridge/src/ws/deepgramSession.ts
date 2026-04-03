@@ -107,7 +107,12 @@ export class DeepgramSession {
     });
 
     this.dgConnection.on(AgentEvents.FunctionCallRequest, async (data: any) => {
-      const { function_call_id, function_name, input } = data;
+      // Debug: log full event structure to understand Deepgram SDK format
+      logger.info('dg.tool_call_raw', { sessionId: this.sessionId, data: JSON.stringify(data), keys: Object.keys(data || {}) });
+
+      const function_call_id = data.function_call_id ?? data.id ?? data.call_id;
+      const function_name = data.function_name ?? data.name;
+      const input = data.input ?? data.arguments ?? data.parameters;
       logger.info('dg.tool_call_request', { sessionId: this.sessionId, name: function_name, callId: function_call_id });
 
       try {
