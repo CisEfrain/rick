@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ping -n 2 raspberrypi.local)",
+      "Bash(ping -n 2 raspberrypi)",
+      "Bash(ipconfig)",
+      "Bash(arp -a)",
+      "Bash(ping -n 2 192.168.1.14)",
+      "Bash(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no pi@192.168.1.14 \"hostname && uname -a\")",
+      "Read(//c/Users/Nubiral/.ssh/**)",
+      "Bash(ssh-keygen -t ed25519 -C \"rick-raspi\" -f ~/.ssh/id_ed25519 -N \"\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"sudo i2cdetect -y 1\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"sudo apt-get install -y i2c-tools 2>&1 | tail -3\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"sudo raspi-config nonint do_i2c 0 && echo 'I2C enabled'\")",
+      "Bash(grep -E \"\\(package\\\\.json|\\\\.ts$\\)\")",
+      "Bash(git -C \"c:/Users/Nubiral/Documents/proyectos/rick\" remote -v)",
+      "Bash(git -C \"c:/Users/Nubiral/Documents/proyectos/rick\" log --oneline -10)",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"sudo apt update -qq 2>&1 | tail -1 && sudo apt install -y -qq alsa-utils 2>&1 | tail -3\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"echo '=== CAPTURE ===' && arecord -l && echo '=== PLAYBACK ===' && aplay -l\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"arecord -D hw:1,0 -r 16000 -c 1 -f S16_LE -t wav -d 3 /tmp/test.wav 2>&1 && echo 'GRABACION OK' && aplay -D hw:0,0 /tmp/test.wav 2>&1 && echo 'REPRODUCCION OK'\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"arecord -D plughw:1,0 -r 16000 -c 1 -f S16_LE -t wav -d 3 /tmp/test.wav 2>&1 && echo 'GRABACION OK'\")",
+      "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"aplay -D plughw:0,0 /tmp/test.wav 2>&1 && echo 'REPRODUCCION OK'\")",
+      "Bash(ssh -o:*)",
+      "Bash(ping -n 3 192.168.1.14)",
+      "Bash(curl -s https://rick-production-2dd3.up.railway.app/health)"
+    ]
+  }
+}
