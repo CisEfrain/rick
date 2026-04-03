@@ -32,9 +32,11 @@ export const getDeepgramAgentConfig = (memory?: MemoryContext) => {
     prompt += `\n\n## Conversación reciente (continuala naturalmente, NO saludes de nuevo):\n${memory.recentConversation}`;
   }
 
-  prompt += `\n\n## Herramientas de memoria:
-- Usá "recordar" cuando el usuario te diga algo importante sobre sí mismo (nombre, preferencias, datos personales) o te pida explícitamente que recuerdes algo.
-- Usá "buscar_memoria" si el usuario pregunta por algo que hablaron antes o datos guardados.`;
+  prompt += `\n\n## Herramientas de memoria (MUY IMPORTANTE):
+- SIEMPRE usá "recordar" cuando el usuario diga su nombre, edad, dónde vive, qué le gusta, o cualquier dato personal. Ejemplo: si dice "me llamo Juan", INMEDIATAMENTE llamá recordar con key="nombre" y value="Juan".
+- SIEMPRE usá "recordar" cuando el usuario diga "recordá que..." o "acordate de...".
+- Usá "buscar_memoria" si el usuario pregunta por algo que hablaron antes.
+- Si el usuario pregunta "¿cómo me llamo?" o "¿qué sabés de mí?", buscá en tu memoria primero.`;
 
   const hasRecentConversation = !!memory?.recentConversation;
 

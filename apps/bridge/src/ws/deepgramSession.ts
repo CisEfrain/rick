@@ -10,7 +10,6 @@ import {
   saveConversation,
   getRecentConversation,
   searchArchival,
-  saveArchival,
 } from '../memory/memoryStore.js';
 
 const IDLE_TIMEOUT_MS = parseInt(process.env.DG_IDLE_TIMEOUT_MS || '120000', 10);
@@ -65,16 +64,16 @@ export class DeepgramSession {
         recentConversation,
       });
 
+      logger.info('dg.configuring', {
+        sessionId: this.sessionId,
+        hasCoreMemory: !!coreMemory,
+        hasRecentConversation: !!recentConversation,
+        prompt: agentConfig.agent.think.prompt,
+        greeting: agentConfig.agent.greeting,
+      });
+
       this.dgConnection.configure(agentConfig);
       this.resetIdleTimer();
-
-      if (coreMemory || recentConversation) {
-        logger.info('dg.memory_loaded', {
-          sessionId: this.sessionId,
-          hasCoreMemory: !!coreMemory,
-          hasRecentConversation: !!recentConversation,
-        });
-      }
     });
 
     this.dgConnection.on(AgentEvents.SettingsApplied, () => {
