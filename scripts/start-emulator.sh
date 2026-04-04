@@ -25,6 +25,12 @@ else
   echo "[1/3] Dependencias OK"
 fi
 
+# Instalar dependencias del emulator-frontend (no es workspace)
+if [ ! -d "apps/emulator-frontend/node_modules" ]; then
+  echo "     Instalando emulator-frontend..."
+  cd apps/emulator-frontend && npm install && cd ../..
+fi
+
 # 2. Verificar archivos .env
 if [ ! -f "apps/bridge/.env" ]; then
   echo ""

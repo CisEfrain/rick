@@ -5,8 +5,7 @@
   "description": "TTS streaming system with WebSocket delivery and chunk-based queue",
   "workspaces": [
     "apps/bridge",
-    "apps/node-client",
-    "apps/emulator-frontend"
+    "apps/node-client"
   ],
   "scripts": {
     "dev": "concurrently -k -p \"{name}\" -c \"cyan,magenta\" \"npm:dev:bridge\" \"npm:dev:client\"",
@@ -14,7 +13,7 @@
     "dev:client": "npm -w apps/node-client run dev",
     "dev:emulator": "concurrently -k -p \"{name}\" -c \"cyan,magenta,yellow\" \"npm:dev:bridge\" \"npm:dev:client:emulator\" \"npm:dev:emulator-frontend\"",
     "dev:client:emulator": "cross-env PLATFORM=emulator npm -w apps/node-client run dev",
-    "dev:emulator-frontend": "npm -w apps/emulator-frontend run dev",
+    "dev:emulator-frontend": "cd apps/emulator-frontend && npm run dev",
     "build": "npm -w apps/bridge run build && npm -w apps/node-client run build",
     "build:bridge": "npm -w apps/bridge run build",
     "build:client": "npm -w apps/node-client run build"
