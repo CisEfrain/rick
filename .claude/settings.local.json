@@ -27,7 +27,9 @@
       "Read(//c/Users/Nubiral/.claude/**)",
       "Read(//c/Users/Nubiral/.claude/projects//**)",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(chmod +x c:/Users/Nubiral/Documents/proyectos/rick/scripts/start-emulator.sh)"
     ]
   }
 }

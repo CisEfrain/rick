@@ -10,12 +10,16 @@
     "dev": "concurrently -k -p \"{name}\" -c \"cyan,magenta\" \"npm:dev:bridge\" \"npm:dev:client\"",
     "dev:bridge": "npm -w apps/bridge run dev",
     "dev:client": "npm -w apps/node-client run dev",
+    "dev:emulator": "concurrently -k -p \"{name}\" -c \"cyan,magenta,yellow\" \"npm:dev:bridge\" \"npm:dev:client:emulator\" \"npm:dev:emulator-frontend\"",
+    "dev:client:emulator": "cross-env PLATFORM=emulator npm -w apps/node-client run dev",
+    "dev:emulator-frontend": "npm -w apps/emulator-frontend run dev",
     "build": "npm -w apps/bridge run build && npm -w apps/node-client run build",
     "build:bridge": "npm -w apps/bridge run build",
     "build:client": "npm -w apps/node-client run build"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -8,7 +8,7 @@ Asistente de voz en tiempo real con personalidad, memoria persistente y cuerpo f
 Usuario (microfono)
    |
    v
-Node Client (Raspberry Pi)
+Node Client (Raspberry Pi o Emulador)
    |  WebSocket (audio PCM 16kHz)
    v
 Bridge (Node.js / Railway)
@@ -18,7 +18,7 @@ Bridge (Node.js / Railway)
    └── Deepgram Aura-2 (TTS) → audio respuesta
    |
    v
-Bridge → Node Client → Parlante
+Bridge → Node Client → Parlante (o browser)
 ```
 
 ## Quick Start
@@ -30,6 +30,14 @@ cp apps/node-client/.env.example apps/node-client/.env  # configurar BRIDGE_WS_U
 npm run dev
 ```
 
+### Modo emulador (sin hardware)
+
+```bash
+npm run dev:emulator
+# Abrir http://localhost:5173 en Chrome
+```
+
+Para mas detalles ver [docs/local-setup.md](docs/local-setup.md).
 Para setup completo en Raspberry Pi ver [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md).
 
 ## Documentacion
@@ -40,6 +48,8 @@ Para setup completo en Raspberry Pi ver [docs/raspberry-pi-setup.md](docs/raspbe
 | [docs/constitution.md](docs/constitution.md) | Principios de diseno, arquitectura, decisiones tecnicas |
 | [docs/raspberry-pi-setup.md](docs/raspberry-pi-setup.md) | Guia paso a paso para instalar en Raspberry Pi |
 | [docs/hardware.md](docs/hardware.md) | Componentes, conexiones GPIO, cableado |
+| [docs/emulator.md](docs/emulator.md) | Emulador: arquitectura, adaptadores, componentes |
+| [docs/local-setup.md](docs/local-setup.md) | Guia de inicio local con emulador |
 | [docs/plan-v2.md](docs/plan-v2.md) | Plan de migracion a pipeline desacoplado (V2) |
 | [CLAUDE.md](CLAUDE.md) | Contexto tecnico para Claude Code |
 | [infra/railway/](infra/railway/) | Deploy del bridge en Railway |

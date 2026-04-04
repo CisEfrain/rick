@@ -1,131 +1,74 @@
 import 'dotenv/config';
-import { ReconnectingWebSocket } from './common/retry.js';
-import { AudioPlayer } from './audio/player.js';
-import { Recorder } from './audio/recorder.js';
-import { logger } from './common/logger.js';
-import * as readline from 'node:readline';
+import { RickClient } from './client.js';
 
-const SESSION_ID = process.env.SESSION_ID || 'raspi-001';
-const BRIDGE_WS_URL = process.env.BRIDGE_WS_URL || 'ws://localhost:3000';
-const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || process.env.TOKEN || '';
-const MUTE_MIC_WHILE_SPEAKING = (process.env.MUTE_MIC_WHILE_SPEAKING || 'true').toLowerCase() === 'true';
-const PLAYBACK_DONE_DELAY_MS = parseInt(process.env.PLAYBACK_DONE_DELAY_MS || '500', 10);
-const wsUrl = `${BRIDGE_WS_URL}?sessionId=${SESSION_ID}&token=${INTERNAL_TOKEN}`;
+const PLATFORM = process.env.PLATFORM || 'raspi';
 
-const player = new AudioPlayer(SESSION_ID);
+async function main() {
+  console.log(`=== Rick Node Client (${PLATFORM}) ===`);
 
-const ws = new ReconnectingWebSocket({
-  url: wsUrl,
-  onOpen: () => {
-    logger.info('client.connected', { sessionId: SESSION_ID });
-  },
-  onMessage: (data, isBinary) => {
-    if (isBinary) {
-      const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
-      player.onAudioChunk(buffer);
-      return;
-    }
+  let audioIn, audioOut, display, motors, button, telemetry;
 
-    try {
-      const msg = JSON.parse(data.toString()) as Record<string, unknown>;
-      if (msg.type === 'audio.start') {
-        if (!player.isPlaying) console.log('\n🔊 [Rick está hablando...]');
-        if (MUTE_MIC_WHILE_SPEAKING) recorder.stopRecording();
-        player.onAudioStart('utt-agent', 'corr-agent', 0);
-      }
-      if (msg.type === 'audio.end') {
-        player.onAudioEnd('utt-agent', 'corr-agent', 0);
-        // Re-enable mic after drain delay + extra margin
-        if (MUTE_MIC_WHILE_SPEAKING) {
-          setTimeout(() => {
-            if (!player.isPlaying) {
-              console.log('⏹ [Rick terminó de hablar]\n');
-              recorder.startRecording();
-            }
-          }, PLAYBACK_DONE_DELAY_MS + 1000);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  },
-  onClose: () => {
-    logger.info('client.disconnected', { sessionId: SESSION_ID });
-  },
-  onError: () => {
-    // Error logged by retry module
-  },
-});
+  if (PLATFORM === 'raspi') {
+    const { NativeAudioInput } = await import('./adapters/raspi/audio-input-native.js');
+    const { NativeAudioOutput } = await import('./adapters/raspi/audio-output-native.js');
+    const { NoopDisplay } = await import('./adapters/raspi/display-noop.js');
+    const { NoopMotors } = await import('./adapters/raspi/motors-noop.js');
+    const { NoopButton } = await import('./adapters/raspi/button-noop.js');
+    const { NativeTelemetry } = await import('./adapters/raspi/telemetry-native.js');
 
-player.setWs(ws);
+    audioIn = new NativeAudioInput();
+    audioOut = new NativeAudioOutput();
+    display = new NoopDisplay();
+    motors = new NoopMotors();
+    button = new NoopButton();
+    telemetry = new NativeTelemetry();
 
-let chunkCount = 0;
-const recorder = new Recorder({
-  sessionId: SESSION_ID,
-  onAudioData: (chunk) => {
-     try {
-       // Visual indicator every ~1 second (16000 bytes/s approx)
-       chunkCount++;
-       if (chunkCount % 50 === 0) {
-         process.stdout.write('.');
-       }
-       ws.send(chunk);
-     } catch(e) { /* ignore */ }
-  }
-});
+  } else if (PLATFORM === 'emulator') {
+    const { FrontendWSServer } = await import('./adapters/emulator/frontend-ws-server.js');
+    const { BrowserAudioInput } = await import('./adapters/emulator/audio-browser-input.js');
+    const { BrowserAudioOutput } = await import('./adapters/emulator/audio-browser-output.js');
+    const { BrowserDisplay } = await import('./adapters/emulator/display-browser.js');
+    const { BrowserMotors } = await import('./adapters/emulator/motors-browser.js');
+    const { BrowserButton } = await import('./adapters/emulator/button-browser.js');
+    const { FakeTelemetry } = await import('./adapters/emulator/telemetry-fake.js');
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  prompt: '',
-});
+    const frontendPort = parseInt(process.env.FRONTEND_WS_PORT || '3001');
+    const frontendWS = new FrontendWSServer(frontendPort);
+    await frontendWS.start();
 
-console.log('');
-console.log('╔══════════════════════════════════════════════════╗');
-console.log('║    Rick Voice Agent Client — Live Streaming     ║');
-console.log('╠══════════════════════════════════════════════════╣');
-console.log('║  Mic is OPEN and sending to Deepgram 24/7        ║');
-console.log('║  Deepgram VAD will auto-detect when you speak    ║');
-console.log('║  !stop              →  Interrupt current audio  ║');
-console.log('║  !quit / Ctrl+C     →  Exit                     ║');
-console.log('╚══════════════════════════════════════════════════╝');
-console.log('');
+    audioIn = new BrowserAudioInput(frontendWS);
+    audioOut = new BrowserAudioOutput(frontendWS);
+    display = new BrowserDisplay(frontendWS);
+    motors = new BrowserMotors(frontendWS);
+    button = new BrowserButton(frontendWS);
+    telemetry = new FakeTelemetry();
 
-// START RECORDING IMMEDIATELY
-recorder.startRecording();
-console.log('🎤 Live Recording Started. Go ahead and say "Hello"! (VAD is Active)');
+    console.log(`Frontend WS: ws://localhost:${frontendPort}`);
+    console.log('Abrí http://localhost:5173 en Chrome para usar el emulador.');
 
-rl.on('line', (line) => {
-  const input = line.trim();
-  if (!input) return;
-
-  if (input === '!quit') {
-    shutdown();
-    return;
+  } else {
+    throw new Error(`Plataforma desconocida: ${PLATFORM}`);
   }
 
-  if (input === '!stop') {
-    player.interrupt();
-    try {
-      ws.send(JSON.stringify({ type: 'stop' }));
-    } catch(e) { /* ignore */ }
-    console.log('⏹ Interrupted playback');
-    return;
-  }
+  const client = new RickClient(audioIn, audioOut, display, motors, button, telemetry, {
+    bridgeWsUrl: process.env.BRIDGE_WS_URL || 'ws://localhost:3000',
+    sessionId: process.env.SESSION_ID || 'rick-001',
+    token: process.env.INTERNAL_TOKEN || process.env.TOKEN || '',
+    muteMicWhileSpeaking: (process.env.MUTE_MIC_WHILE_SPEAKING || 'true').toLowerCase() === 'true',
+    playbackDoneDelayMs: parseInt(process.env.PLAYBACK_DONE_DELAY_MS || '500', 10),
+    pttMode: PLATFORM === 'emulator',
+  });
 
-  console.log(`Unknown command: ${input}`);
-});
+  await client.start();
 
-ws.connect();
+  const shutdown = async () => {
+    console.log('\nApagando...');
+    await client.stop();
+    process.exit(0);
+  };
 
-function shutdown(): void {
-  logger.info('client.shutdown', { sessionId: SESSION_ID });
-  recorder.stopRecording();
-  player.cleanup();
-  ws.close();
-  rl.close();
-  process.exit(0);
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+main().catch(console.error);

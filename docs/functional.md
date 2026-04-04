@@ -85,7 +85,8 @@ Historial buscable de conversaciones pasadas y datos guardados:
 Usuario habla al microfono
         |
         v
-arecord captura audio PCM 16kHz
+Adaptador de audio captura PCM 16kHz
+  (Pi: arecord/sox | Emulador: microfono del browser)
         |
         v
 Node Client envia audio via WebSocket
@@ -100,7 +101,8 @@ Bridge: LLM (OpenAI GPT streaming + function calling) → respuesta texto
 Bridge: TTS (Deepgram Aura-2) → audio por oracion
         |
         v
-Node Client reproduce por parlante (aplay)
+Adaptador de audio reproduce
+  (Pi: aplay/sox | Emulador: Web Audio API en el browser)
         |
         v
 Mic se reactiva despues de un delay
@@ -110,3 +112,9 @@ Vuelve a IDLE
 ```
 
 Si el LLM necesita datos externos (memoria, herramientas), el bridge ejecuta las tools directamente via OpenAI function calling. Las tools de memoria se manejan localmente; las externas van a n8n via HTTP.
+
+---
+
+## Emulador
+
+Rick puede correr sin hardware fisico usando el modo emulador. El mismo Node Client usa adaptadores que delegan al browser en vez de a dispositivos fisicos. Ver [emulator.md](emulator.md) para detalles y [local-setup.md](local-setup.md) para la guia de inicio local.
