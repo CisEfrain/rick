@@ -7,7 +7,7 @@
 ## Build settings:
 - **Root Directory**: `/`
 - **Builder**: `Nixpacks` or `Dockerfile`
-- **Build Command**: `npm ci && npm run build:bridge`
+- **Build Command**: `npm ci -w apps/bridge && npm run build:bridge`
 - **Start Command**: `node apps/bridge/dist/index.js`
 - **Watch Paths**: `apps/bridge/**`
 

@@ -4,7 +4,9 @@
   "private": true,
   "description": "TTS streaming system with WebSocket delivery and chunk-based queue",
   "workspaces": [
-    "apps/*"
+    "apps/bridge",
+    "apps/node-client",
+    "apps/emulator-frontend"
   ],
   "scripts": {
     "dev": "concurrently -k -p \"{name}\" -c \"cyan,magenta\" \"npm:dev:bridge\" \"npm:dev:client\"",
