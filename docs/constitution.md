@@ -32,8 +32,8 @@ Rick es un robot fisico interactivo que:
 |------|----------------|
 | Hardware | Captura y salida fisica (mic, parlante, pantalla, motores) |
 | Runtime local (Node.js) | Control, captura de audio, reproduccion, orquestacion |
-| Bridge (Node.js) | Relay WebSocket, gestion de sesiones Deepgram, memoria |
-| IA (Deepgram + LLM) | STT, razonamiento, TTS |
+| Bridge (Node.js) | Orquesta pipeline STT+LLM+TTS, gestion de sesiones, memoria, ejecucion de tools |
+| IA | Deepgram Nova-3 (STT), OpenAI GPT (LLM + tools), Deepgram Aura-2 (TTS) |
 
 ### 2.3 Control determinista
 
@@ -60,21 +60,20 @@ Usuario (microfono)
 Node Client (Raspberry Pi)
    |  WebSocket (audio binario + JSON control)
    v
-Bridge (Node.js / Railway)
-   |  WebSocket Voice Agent Session
-   v
-Deepgram Voice Agent (STT nova-3 + LLM gpt-4o-mini + TTS aura-2-alvaro-es)
-   |  FunctionCallRequest (si necesita datos)
-   v
-Bridge
-   |  Maneja tools de memoria localmente
-   |  O HTTP POST a n8n para tools externas
-   v
-n8n (herramientas externas)
+Bridge (Node.js / Railway) — Pipeline Orchestrator
    |
-   v
-Deepgram (continua respuesta con contexto)
-   |  Audio PCM binario
+   ├── 1. STT: Deepgram Nova-3 (streaming WebSocket)
+   |      Audio → transcripcion en tiempo real
+   |
+   ├── 2. LLM: OpenAI GPT (streaming HTTP + function calling)
+   |      Transcripcion → respuesta texto (+ tools si necesita)
+   |      Tools sincronicas: recordar, buscar_memoria, obtener_clima, obtener_hora
+   |      Tools asincronicas: mover, poner_alarma (background queue + habla proactiva)
+   |      Tools externas: ejecutar_n8n (HTTP POST a n8n)
+   |
+   └── 3. TTS: Deepgram Aura-2 (HTTP REST)
+          Texto → audio PCM por oracion
+   |
    v
 Bridge -> Node Client -> Parlante
 ```
@@ -100,7 +99,7 @@ IDLE
 LISTENING (VAD detecta voz / boton presionado en futuro)
  |
  v
-PROCESSING (Deepgram procesa)
+PROCESSING (STT+LLM+TTS procesa)
  |
  v
 SPEAKING (TTS reproduciendo)
@@ -125,9 +124,10 @@ IDLE
 - Half-duplex por software (mute mic durante TTS)
 - Audio por cable USB (estable)
 - Bridge en la nube (Railway) para no saturar la Pi
-- Deepgram Voice Agent como pipeline unificado (STT+LLM+TTS)
+- Pipeline desacoplado STT+LLM+TTS (control total, costo ~$5-10/mes)
 - Memoria persistente en JSON (Core Memory + Archival)
 - Desconexion por inactividad (2 min) para ahorrar API
+- Streaming sentence-level TTS (genera audio por oracion para baja latencia)
 
 ### Rechazadas
 
@@ -137,6 +137,7 @@ IDLE
 - Microfonos analogicos (USB es plug-and-play)
 - Full-duplex en V1 (requiere hardware AEC)
 - Base de datos para memoria (JSON es suficiente en V1)
+- Deepgram Voice Agent como pipeline unificado (costo $4.50/hr, vendor lock-in, control limitado del LLM)
 
 ---
 
@@ -169,6 +170,7 @@ IDLE
 | Ruido electrico de motores | Bateria separada |
 | Latencia de red | Bridge en Railway (baja latencia) |
 | Complejidad creciente | Arquitectura modular |
-| Costo de API Deepgram | Auto-desconexion por inactividad |
+| Costo de APIs (Deepgram + OpenAI) | Auto-desconexion STT por inactividad, pipeline desacoplado reduce costo 10x |
+| Latencia del pipeline desacoplado | Streaming sentence-level TTS, LLM streaming |
 | Perdida de memoria | JSON persistente con escritura atomica |
 | Pi Zero lenta | Solo corre el cliente, bridge en la nube |

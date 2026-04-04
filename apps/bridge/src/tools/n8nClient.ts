@@ -1,7 +1,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import { logger } from '../common/logger.js';
-import { config } from '../config/deepgramConfig.js';
+import { config } from '../config/appConfig.js';
 
 export interface ToolCallArgs {
   toolName: string;

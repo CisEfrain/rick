@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Rick is a real-time voice agent system powered by Deepgram Voice Agent. Audio flows: **Node Client** (mic capture) → **Bridge** (WebSocket relay) → **Deepgram** (STT + LLM + TTS) → Bridge → Node Client (speaker playback). Memory tools are handled locally by the bridge; external tools go to n8n via HTTP webhook.
+Rick is a real-time voice agent system with a desacoplado pipeline. Audio flows: **Node Client** (mic capture) → **Bridge** (pipeline orchestrator) → **Deepgram Nova-3** (STT streaming) → **OpenAI GPT** (LLM + function calling) → **Deepgram Aura-2** (TTS) → Bridge → Node Client (speaker playback). Memory tools are handled locally by the bridge; external tools go to n8n via HTTP webhook.
 
 The project is in Spanish (prompts, agent persona, function names like `recordar`).
 
@@ -12,7 +12,7 @@ The project is in Spanish (prompts, agent persona, function names like `recordar
 
 npm workspaces monorepo. Two apps under `apps/`:
 
-- **`apps/bridge`** — Express + WebSocket server. Creates a `DeepgramSession` per client, forwards audio bidirectionally, manages memory (JSON files), and handles function calls. Deployed on Railway.
+- **`apps/bridge`** — Express + WebSocket server. Creates a `Pipeline` per client that orchestrates STT→LLM→TTS, manages memory (JSON files), and handles function calls via OpenAI tool calling. Deployed on Railway.
 - **`apps/node-client`** — CLI client for Raspberry Pi or Windows. Captures mic audio, streams PCM 16kHz to bridge, plays back agent audio. Mutes mic during agent speech to prevent echo.
 
 ## Common Commands
@@ -39,14 +39,14 @@ Individual apps use `tsx` for dev and `tsc` for production builds. Output goes t
 
 ### Key Flow: Bridge WebSocket Connection
 1. Client connects with `?sessionId=X&token=Y` query params
-2. `clientHub.ts` authenticates and creates a `DeepgramSession`
-3. `DeepgramSession` opens Deepgram Agent API, configures STT (nova-3), LLM (gpt-4o-mini), TTS (aura-2-alvaro-es)
-4. On `FunctionCallRequest`: if `recordar` or `buscar_memoria` → handle locally via `memoryStore.ts`; otherwise → POST to n8n webhook
-5. `FunctionCallResponse` format: `{ type, id, name, content }` (per Deepgram docs)
+2. `clientHub.ts` authenticates and creates a `Pipeline`
+3. `Pipeline` connects Deepgram STT streaming (Nova-3), initializes OpenAI LLM with system prompt + tools + core memory
+4. Audio chunks → STT transcription → LLM generates response (streaming, with optional tool calls handled by `toolExecutor.ts`) → `TextAccumulator` splits into sentences → TTS synthesizes each sentence → audio forwarded to client
+5. Tools available: `recordar`, `buscar_memoria` (local memory), `obtener_clima` (OpenWeatherMap), `obtener_hora` (local), `mover`, `poner_alarma` (async via BackgroundQueue), `ejecutar_n8n` (webhook). Async tools dispatch to background queue; completed tasks trigger proactive LLM messages.
 
 ### Key Flow: Node Client
 1. `ReconnectingWebSocket` handles connection with auto-reconnect
-2. `Recorder` captures mic audio continuously (VAD handled by Deepgram)
+2. `Recorder` captures mic audio continuously (VAD handled by Deepgram STT)
 3. `AudioPlayer` queues and plays back agent audio chunks via aplay/SoX
 4. Player reuses aplay process across utterances (drain delay prevents gaps)
 
@@ -54,26 +54,36 @@ Individual apps use `tsx` for dev and `tsc` for production builds. Output goes t
 - **Core Memory** (Level 1): User name, facts, preferences. Always injected into the system prompt on every session. Stored in JSON.
 - **Archival Memory** (Level 2): Conversation history + explicit saves. Searchable via `buscar_memoria` tool.
 - **Storage**: JSON files at `data/memory/{sessionId}.json` (configurable via `MEMORY_DIR` env var).
-- **Lifecycle**: Conversations accumulated via `ConversationText` events, persisted on idle disconnect. Core memory loaded on every `connectDg()`.
+- **Lifecycle**: Conversations accumulated from STT utterances + LLM responses, persisted on idle disconnect. Core memory loaded on every pipeline init/reconnect.
 
 ### Idle Disconnect
-- After `DG_IDLE_TIMEOUT_MS` (default 2 min) of no audio, Deepgram session closes to save API credits.
-- Client WebSocket stays open. On next audio, bridge reconnects to Deepgram with memory context.
+- After `STT_IDLE_TIMEOUT_MS` (default 2 min) of no audio, STT session closes to save API credits.
+- Client WebSocket stays open. On next audio, bridge reconnects STT and refreshes system prompt with latest memory.
 - Greeting is suppressed when resuming a recent conversation.
 
 ## Environment Variables
 
 See `apps/bridge/.env.example` and `apps/node-client/.env.example`. Key bridge vars:
-- `DEEPGRAM_API_KEY` — Required
+- `DEEPGRAM_API_KEY` — Required (for STT + TTS)
+- `OPENAI_API_KEY` — Required (for LLM)
 - `INTERNAL_TOKEN` — Shared secret for client-bridge auth
 - `N8N_TOOL_WEBHOOK_URL` — Webhook for external tools (optional)
-- `DG_IDLE_TIMEOUT_MS` — Idle timeout before disconnecting Deepgram (default: 120000)
+- `STT_MODEL` — Deepgram STT model (default: nova-3)
+- `STT_LANGUAGE` — STT language (default: es)
+- `STT_IDLE_TIMEOUT_MS` — Idle timeout before disconnecting STT (default: 120000)
+- `LLM_MODEL` — OpenAI model (default: gpt-4o-mini)
+- `LLM_MAX_TOKENS` — Max response tokens (default: 300)
+- `LLM_TEMPERATURE` — LLM temperature (default: 0.8)
+- `TTS_MODEL` — Deepgram TTS voice (default: aura-2-es-alvaro)
+- `TTS_SAMPLE_RATE` — TTS audio sample rate (default: 16000)
+- `WEATHER_API_KEY` — OpenWeatherMap API key for `obtener_clima` tool (optional)
 - `MEMORY_DIR` — Path for memory JSON files (default: `data/memory/`)
 
 ## Tech Stack
 
 - TypeScript (strict), Node.js >=20
-- `@deepgram/sdk` for Voice Agent API
+- `@deepgram/sdk` for STT streaming and TTS
+- `openai` for LLM with function calling
 - `ws` for WebSocket (both apps)
 - `express` for HTTP endpoints (bridge)
 - `tsx` for dev, `tsc` for builds

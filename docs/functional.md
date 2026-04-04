@@ -4,7 +4,7 @@
 
 Rick es un asistente de voz con personalidad que vive en tu casa. Es simpatico, gracioso y un poco nerd. Habla en espanol y se adapta a quien le hable: con chicos es paciente y divertido, con adultos ajusta el tono.
 
-Rick escucha a traves de un microfono, procesa la voz con inteligencia artificial (Deepgram + GPT-4o-mini), y responde por los parlantes con voz sintetizada.
+Rick escucha a traves de un microfono, procesa la voz con inteligencia artificial (Deepgram Nova-3 STT + OpenAI GPT + Deepgram Aura-2 TTS), y responde por los parlantes con voz sintetizada.
 
 ---
 
@@ -12,7 +12,7 @@ Rick escucha a traves de un microfono, procesa la voz con inteligencia artificia
 
 1. **Hablar naturalmente** — Rick usa deteccion automatica de voz (VAD). No hace falta apretar nada, simplemente habla.
 2. **Escuchar la respuesta** — Rick responde por los parlantes. Mientras habla, el microfono se silencia automaticamente para evitar eco.
-3. **Ahorro de API** — Si no hablas por 2 minutos, Rick se desconecta de Deepgram (deja de consumir creditos). Cuando volves a hablar, se reconecta automaticamente.
+3. **Ahorro de API** — Si no hablas por 2 minutos, Rick se desconecta del STT de Deepgram (deja de consumir creditos). Cuando volves a hablar, se reconecta automaticamente.
 4. **Continuidad** — Al reconectar, Rick recuerda la conversacion reciente y no repite el saludo.
 
 ---
@@ -49,6 +49,10 @@ Historial buscable de conversaciones pasadas y datos guardados:
 | Le decis tu nombre | Llama la herramienta `recordar` y lo guarda en Core Memory |
 | Le pedis "acordate de X" | Guarda X en Core Memory |
 | Preguntas "¿que hablamos ayer?" | Llama `buscar_memoria` y busca en el historial |
+| Preguntas la hora o fecha | Llama `obtener_hora` y te dice la hora actual |
+| Preguntas por el clima | Llama `obtener_clima` y consulta OpenWeatherMap |
+| Le pedis que se mueva | Llama `mover` (asincronica) y te avisa cuando termina |
+| Le pedis una alarma | Llama `poner_alarma` (asincronica) y te avisa cuando suena |
 | Se desconecta por inactividad | Guarda los mensajes de la sesion actual |
 | Se reconecta | Carga Core Memory + ultima conversacion en el prompt |
 
@@ -68,7 +72,7 @@ Historial buscable de conversaciones pasadas y datos guardados:
 | Estado | Que pasa | UI OLED (futuro) |
 |--------|----------|-----------------|
 | IDLE | Esperando que alguien hable | Dormido |
-| LISTENING | Deepgram detecto voz, escuchando | Escuchando |
+| LISTENING | STT detecta voz, escuchando | Escuchando |
 | PROCESSING | Procesando respuesta con IA | Pensando |
 | SPEAKING | Reproduciendo respuesta por parlante | Hablando |
 | ERROR | Algo salio mal | Error |
@@ -87,13 +91,13 @@ arecord captura audio PCM 16kHz
 Node Client envia audio via WebSocket
         |
         v
-Bridge recibe y reenvia a Deepgram Voice Agent
+Bridge: STT (Deepgram Nova-3 streaming) → transcripcion
         |
         v
-Deepgram: STT (Nova-3) → LLM (GPT-4o-mini) → TTS (Aura-2-Alvaro)
-        |
+Bridge: LLM (OpenAI GPT streaming + function calling) → respuesta texto
+        |  (si necesita datos: ejecuta tools de memoria o n8n)
         v
-Bridge recibe audio de respuesta
+Bridge: TTS (Deepgram Aura-2) → audio por oracion
         |
         v
 Node Client reproduce por parlante (aplay)
@@ -105,4 +109,4 @@ Mic se reactiva despues de un delay
 Vuelve a IDLE
 ```
 
-Si el LLM necesita datos externos (memoria, herramientas), el bridge maneja la llamada localmente o via n8n.
+Si el LLM necesita datos externos (memoria, herramientas), el bridge ejecuta las tools directamente via OpenAI function calling. Las tools de memoria se manejan localmente; las externas van a n8n via HTTP.

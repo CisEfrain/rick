@@ -16,10 +16,19 @@
 | Variable | Description | Example |
 |---|---|---|
 | `PORT` | Set automatically by Railway | `3000` |
-| `DEEPGRAM_API_KEY` | Your Deepgram SDK/API Key | `...` |
+| `DEEPGRAM_API_KEY` | Deepgram API Key (for STT + TTS) | `...` |
+| `OPENAI_API_KEY` | OpenAI API Key (for LLM) | `...` |
 | `INTERNAL_TOKEN` | Token checked when clients connect via WS | `secr3t!` |
 | `N8N_TOOL_WEBHOOK_URL` | Webhook URL pointing to n8n (optional) | `https://n8n.../webhook/tool` |
-| `DG_IDLE_TIMEOUT_MS` | Ms of inactivity before closing Deepgram session | `120000` |
+| `STT_MODEL` | Deepgram STT model | `nova-3` |
+| `STT_LANGUAGE` | STT language code | `es` |
+| `STT_IDLE_TIMEOUT_MS` | Ms of inactivity before closing STT session | `120000` |
+| `LLM_MODEL` | OpenAI model name | `gpt-4o-mini` |
+| `LLM_MAX_TOKENS` | Max response tokens | `300` |
+| `LLM_TEMPERATURE` | LLM temperature | `0.8` |
+| `TTS_MODEL` | Deepgram TTS voice model | `aura-2-es-alvaro` |
+| `TTS_SAMPLE_RATE` | Audio sample rate for TTS output | `16000` |
+| `WEATHER_API_KEY` | OpenWeatherMap API key (optional, for clima tool) | `...` |
 | `MEMORY_DIR` | Path for persistent memory JSON files | `/data/memory` |
 
 ## Persistent Storage

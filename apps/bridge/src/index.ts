@@ -1,11 +1,10 @@
-import './polyfill.js';
 import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import { logger } from './common/logger.js';
-import { config } from './config/deepgramConfig.js';
+import { config } from './config/appConfig.js';
 import { setupClientHub } from './ws/clientHub.js';
 
 

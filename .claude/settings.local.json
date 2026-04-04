@@ -22,7 +22,12 @@
       "Bash(ssh -o ConnectTimeout=5 pi@192.168.1.14 \"aplay -D plughw:0,0 /tmp/test.wav 2>&1 && echo 'REPRODUCCION OK'\")",
       "Bash(ssh -o:*)",
       "Bash(ping -n 3 192.168.1.14)",
-      "Bash(curl -s https://rick-production-2dd3.up.railway.app/health)"
+      "Bash(curl -s https://rick-production-2dd3.up.railway.app/health)",
+      "Read(//c/Users/Nubiral/.claude//**)",
+      "Read(//c/Users/Nubiral/.claude/**)",
+      "Read(//c/Users/Nubiral/.claude/projects//**)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
