@@ -64,8 +64,8 @@ export class RickClient {
 
     // Reproducción terminó → reactivar micrófono
     this.audioOut.on('finished', () => {
+      logger.info('audioOut.finished', { state: this.state });
       if (this.config.pttMode) {
-        // En modo toggle/PTT: reactivar audioIn para que el audio del browser fluya
         this.audioIn.start().catch(() => {});
         this.setState('IDLE');
       } else if (this.config.muteMicWhileSpeaking) {
@@ -82,6 +82,7 @@ export class RickClient {
 
     // PTT: botón controla inicio/fin de captura
     this.button.on('press', async () => {
+      logger.info('button.press', { state: this.state, pttMode: this.config.pttMode });
       if (this.config.pttMode && this.state === 'IDLE') {
         await this.audioIn.start();
         this.setState('LISTENING');
@@ -145,8 +146,18 @@ export class RickClient {
       }
 
       if (msg.type === 'audio.end') {
+        logger.info('audio.end.received', { state: this.state });
         this.audioOut.flush();
         this.display.notify('speaking_done', {});
+
+        // Safety: si playback_done nunca llega del browser, forzar IDLE después de 10s
+        setTimeout(() => {
+          if (this.state === 'SPEAKING') {
+            logger.warn('audio.playback_timeout', { message: 'Forcing state to IDLE after timeout' });
+            this.audioIn.start().catch(() => {});
+            this.setState('IDLE');
+          }
+        }, 10000);
       }
 
       if (msg.type === 'motor_command') {
