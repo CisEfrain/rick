@@ -12,7 +12,7 @@ export const config = {
   sttModel: process.env.STT_MODEL || 'nova-3',
   sttLanguage: process.env.STT_LANGUAGE || 'es',
   sttIdleTimeoutMs: parseInt(process.env.STT_IDLE_TIMEOUT_MS || '120000', 10),
-  sttUtteranceEndMs: parseInt(process.env.STT_UTTERANCE_END_MS || '500', 10),
+  sttUtteranceEndMs: parseInt(process.env.STT_UTTERANCE_END_MS || '1000', 10),
 
   // LLM
   llmModel: process.env.LLM_MODEL || 'gpt-4o-mini',
