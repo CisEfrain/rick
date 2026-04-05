@@ -200,10 +200,16 @@ export class Pipeline {
 
     while (this.ttsQueue.length > 0) {
       const sentence = this.ttsQueue.shift()!;
-      // speak() envía texto + Flush al WS de Deepgram.
-      // Los chunks de audio llegan via evento "audio" (wired en constructor).
-      // speak() resuelve cuando Deepgram confirma Flushed.
-      await this.tts.speak(sentence);
+      try {
+        await this.tts.speak(sentence);
+      } catch (err: any) {
+        logger.error('pipeline.tts_error', {
+          sessionId: this.sessionId,
+          message: err?.message || String(err),
+          sentence: sentence.slice(0, 50),
+        });
+        // TTS falló — seguir con la siguiente oración
+      }
     }
 
     this.ttsProcessing = false;
