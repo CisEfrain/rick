@@ -139,6 +139,14 @@ export class Pipeline {
       }
     });
 
+    this.llm.on('tool_call', (data) => {
+      this.forwardJsonToClient({ type: 'tool_call', name: data.name, args: data.args });
+    });
+
+    this.llm.on('tool_result', (data) => {
+      this.forwardJsonToClient({ type: 'tool_result', name: data.name, result: data.result });
+    });
+
     this.llm.on('error', (err) => {
       logger.error('pipeline.llm_stream_error', {
         sessionId: this.sessionId,

@@ -6,7 +6,7 @@ interface MicButtonProps {
   onToggle: () => void;
 }
 
-export function MicButton({ active, level, speaking, rickState, onToggle }: MicButtonProps) {
+export function MicButton({ active, level, speaking, onToggle }: MicButtonProps) {
   const r = Math.min(100, level) / 100;
 
   return (
@@ -14,7 +14,7 @@ export function MicButton({ active, level, speaking, rickState, onToggle }: MicB
       <button
         onClick={onToggle}
         style={{
-          width: 88, height: 88, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          width: 72, height: 72, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: active
             ? 'radial-gradient(circle, #e74c3c, #c0392b)'
             : speaking
@@ -30,7 +30,7 @@ export function MicButton({ active, level, speaking, rickState, onToggle }: MicB
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
           {speaking ? (
             <>
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" />
@@ -48,21 +48,18 @@ export function MicButton({ active, level, speaking, rickState, onToggle }: MicB
       </button>
 
       <span style={{
-        fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
-        color: active ? '#e74c3c' : speaking ? '#2ecc71' : '#2a2a4a',
+        fontSize: 9, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
+        color: active ? '#e74c3c' : speaking ? '#2ecc71' : '#6b7280',
       }}>
-        {active ? 'Mic activo — click para apagar' : speaking ? 'Rick habla' : 'Click para activar mic'}
+        {active ? 'Click para apagar' : speaking ? 'Rick habla' : 'Click para activar mic'}
       </span>
 
       {active && (
-        <div style={{ display: 'flex', gap: 1.5, height: 18, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 1.5, height: 14, alignItems: 'flex-end' }}>
           {Array.from({ length: 20 }).map((_, i) => (
             <div key={i} style={{
-              width: 2.5,
-              height: Math.max(2, (level / 5) + Math.random() * 6),
-              background: '#e74c3c',
-              borderRadius: 1,
-              transition: 'height 0.05s',
+              width: 2, height: Math.max(2, (level / 5) + Math.random() * 5),
+              background: '#e74c3c', borderRadius: 1, transition: 'height 0.05s',
             }} />
           ))}
         </div>

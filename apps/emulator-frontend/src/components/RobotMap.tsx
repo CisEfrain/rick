@@ -13,7 +13,7 @@ export function RobotMap({ motors, pos }: RobotMapProps) {
       position: 'relative', width: '100%', height: 200,
       background: '#060610', borderRadius: 6, border: '0.5px solid #14142a', overflow: 'hidden',
     }}>
-      <div style={{ position: 'absolute', fontSize: 8, color: '#0e0e1e', top: 4, left: 6, fontFamily: 'monospace' }}>
+      <div style={{ position: 'absolute', fontSize: 8, color: '#4a5568', top: 4, left: 6, fontFamily: 'monospace' }}>
         MAPA 2D — tracción diferencial
       </div>
 
@@ -41,12 +41,12 @@ export function RobotMap({ motors, pos }: RobotMapProps) {
       </div>
 
       {/* Coords */}
-      <div style={{ position: 'absolute', bottom: 4, right: 6, fontSize: 8, color: '#14142a', fontFamily: 'monospace' }}>
+      <div style={{ position: 'absolute', bottom: 4, right: 6, fontSize: 8, color: '#4a5568', fontFamily: 'monospace' }}>
         x:{Math.round(pos.x)} y:{Math.round(pos.y)} θ:{Math.round(pos.angle)}°
       </div>
       <div style={{ position: 'absolute', bottom: 4, left: 6, fontSize: 8, fontFamily: 'monospace' }}>
-        <span style={{ color: motors.left ? '#2ecc71' : '#14142a' }}>L:{motors.left}%</span>{' '}
-        <span style={{ color: motors.right ? '#2ecc71' : '#14142a' }}>R:{motors.right}%</span>
+        <span style={{ color: motors.left ? '#2ecc71' : '#4a5568' }}>L:{motors.left}%</span>{' '}
+        <span style={{ color: motors.right ? '#2ecc71' : '#4a5568' }}>R:{motors.right}%</span>
       </div>
     </div>
   );

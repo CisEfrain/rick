@@ -9,7 +9,6 @@ const LEVEL_COLORS: Record<string, string> = {
 };
 
 export function LogViewer({ logs }: { logs: LogEntry[] }) {
-  const ref = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,20 +21,19 @@ export function LogViewer({ logs }: { logs: LogEntry[] }) {
     <div
       ref={containerRef}
       style={{
-        flex: 1, overflowY: 'auto',
-        fontFamily: 'monospace', fontSize: 10, lineHeight: 1.8,
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        fontFamily: 'monospace', fontSize: 10, lineHeight: 1.7,
         padding: 8, background: '#050510', borderRadius: 6, border: '0.5px solid #1e1e3a',
       }}
     >
       {logs.map((l, i) => (
-        <div key={i}>
+        <div key={i} style={{ whiteSpace: 'nowrap' }}>
           <span style={{ color: '#4a5568' }}>{new Date(l.ts).toLocaleTimeString('es-AR')}</span>{' '}
-          <span style={{ color: LEVEL_COLORS[l.level] || '#6b7280' }}>[{l.src}]</span>{' '}
-          <span style={{ color: LEVEL_COLORS[l.level] || '#8892a4' }}>{l.msg}</span>
+          <span style={{ color: LEVEL_COLORS[l.level] || '#6b7280', fontWeight: 600 }}>[{l.src}]</span>{' '}
+          <span style={{ color: '#8892a4' }}>{l.msg}</span>
         </div>
       ))}
-      {!logs.length && <div style={{ color: '#4a5568' }}>Conectá al Node Client para ver logs...</div>}
-      <div ref={ref} />
+      {!logs.length && <div style={{ color: '#4a5568' }}>Esperando conexión...</div>}
     </div>
   );
 }

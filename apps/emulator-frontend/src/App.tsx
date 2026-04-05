@@ -40,7 +40,7 @@ export function App() {
   const statusColors: Record<string, string> = { disconnected: '#e74c3c', connecting: '#f39c12', connected: '#2ecc71', error: '#e74c3c' };
   const statusLabels: Record<string, string> = { disconnected: 'Desconectado', connecting: 'Conectando...', connected: 'Conectado', error: 'Error' };
 
-  const sec: React.CSSProperties = { background: '#0a0a15', borderRadius: 8, border: '0.5px solid #1e1e3a', padding: 12 };
+  const sec: React.CSSProperties = { background: '#0a0a15', borderRadius: 8, border: '0.5px solid #1e1e3a', padding: 12, display: 'flex', flexDirection: 'column' };
   const hd: React.CSSProperties = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4a5568', marginBottom: 8 };
 
   const connBtn = (c: string): React.CSSProperties => ({
@@ -49,34 +49,21 @@ export function App() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#060610', color: '#b0b8c8', fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#060610', color: '#b0b8c8', fontFamily: "'JetBrains Mono', 'Fira Code', monospace", overflow: 'hidden' }}>
 
-      {/* Title bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid #1e1e3a' }}>
+      {/* Title + Connection bar (merged) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', background: '#08080f', borderBottom: '0.5px solid #1e1e3a', flexShrink: 0 }}>
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
           background: statusColors[state.wsState],
           boxShadow: `0 0 6px ${statusColors[state.wsState]}55`,
         }} />
-        <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, color: '#e2e8f0' }}>RICK</span>
-        <span style={{ fontSize: 9, color: '#4a5568' }}>EMULADOR DE RASPBERRY PI</span>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 9, color: '#8892a4', padding: '2px 8px', border: '0.5px solid #1e1e3a', borderRadius: 4 }}>
-          {state.rickState}
-        </span>
-        <span style={{ fontSize: 9, color: '#4a5568' }}>v2.0</span>
-      </div>
-
-      {/* Connection bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#08080f', borderBottom: '0.5px solid #1e1e3a' }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: statusColors[state.wsState],
-          boxShadow: `0 0 6px ${statusColors[state.wsState]}66`,
-        }} />
+        <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: 3, color: '#e2e8f0' }}>RICK</span>
+        <span style={{ fontSize: 9, color: '#4a5568' }}>EMULATOR</span>
+        <div style={{ width: 1, height: 16, background: '#1e1e3a', margin: '0 4px' }} />
         <span style={{
           fontSize: 10, color: statusColors[state.wsState], fontWeight: 600,
-          textTransform: 'uppercase', letterSpacing: 0.5, minWidth: 90,
+          textTransform: 'uppercase', letterSpacing: 0.5,
         }}>
           {statusLabels[state.wsState]}
         </span>
@@ -85,9 +72,9 @@ export function App() {
           onChange={e => dispatch({ type: 'SET', v: { wsUrl: e.target.value } })}
           placeholder="ws://localhost:3001"
           style={{
-            flex: 1, padding: '5px 10px', borderRadius: 6,
+            flex: 1, padding: '4px 10px', borderRadius: 6,
             border: '1px solid #1e1e3a', background: '#0a0a14', color: '#cbd5e0',
-            fontSize: 12, outline: 'none', maxWidth: 360,
+            fontSize: 11, outline: 'none', maxWidth: 300,
           }}
         />
         {state.wsState === 'connected' ? (
@@ -95,18 +82,17 @@ export function App() {
         ) : (
           <button onClick={connect} disabled={state.wsState === 'connecting'} style={connBtn('#2ecc71')}>Conectar</button>
         )}
+        <div style={{ width: 1, height: 16, background: '#1e1e3a', margin: '0 4px' }} />
+        <span style={{ fontSize: 9, color: '#8892a4', padding: '2px 8px', border: '0.5px solid #1e1e3a', borderRadius: 4 }}>
+          {state.rickState}
+        </span>
       </div>
 
-      {/* Info banner */}
-      <div style={{ padding: '6px 16px', fontSize: 10, color: '#6b7280', borderBottom: '0.5px solid #0d0d1a', lineHeight: 1.6 }}>
-        Este emulador reemplaza la Raspberry Pi. Se conecta al Node Client que se conecta al Bridge real.
-        El pipeline de voz (Deepgram STT → GPT → Deepgram TTS) es real.
-        Clickeá el botón del micrófono para activar/desactivar.
-      </div>
+      {/* Main content — fills remaining height */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12, gap: 10, minHeight: 0 }}>
 
-      <div style={{ padding: 12 }}>
-        {/* Central: Mic + OLED */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 28, padding: '14px 0 10px', flexWrap: 'wrap' }}>
+        {/* Top row: Mic + OLED + Transcript */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, flexShrink: 0 }}>
           <MicButton
             active={micOn}
             level={micLevel}
@@ -115,31 +101,33 @@ export function App() {
             onToggle={toggleMic}
           />
           <OLEDScreen oled={state.oled} />
+          {state.transcript && (
+            <div style={{ fontSize: 12, color: '#4fc3f7', maxWidth: 200, fontStyle: 'italic' }}>
+              "{state.transcript}"
+            </div>
+          )}
         </div>
 
-        {/* 3-column grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        {/* Bottom grid — fills remaining space */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr', gap: 10, minHeight: 0, overflow: 'hidden' }}>
 
           {/* Conversation */}
-          <div style={{ ...sec, display: 'flex', flexDirection: 'column', maxHeight: 340 }}>
+          <div style={sec}>
             <div style={hd}>Conversación</div>
             <Conversation messages={state.messages} />
           </div>
 
-          {/* Robot movement */}
+          {/* Robot */}
           <div style={sec}>
-            <div style={hd}>Tracción diferencial (emulada)</div>
+            <div style={hd}>Motores</div>
             <RobotMap motors={state.motors} pos={state.robotPos} />
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
               <MotorControls onMove={onMotorMove} />
             </div>
-            <div style={{ marginTop: 6, fontSize: 9, color: '#4a5568', textAlign: 'center' }}>
-              Controles manuales — en producción Rick se mueve via function calls
-            </div>
           </div>
 
           {/* Logs */}
-          <div style={{ ...sec, display: 'flex', flexDirection: 'column', maxHeight: 340 }}>
+          <div style={sec}>
             <div style={hd}>Logs</div>
             <LogViewer logs={state.logs} />
           </div>

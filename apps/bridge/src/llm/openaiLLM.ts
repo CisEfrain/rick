@@ -10,6 +10,8 @@ import type { ChatCompletionMessageParam } from 'openai/resources/chat/completio
 export interface OpenAILLMEvents {
   text_chunk: [chunk: string];
   response_complete: [fullText: string];
+  tool_call: [data: { name: string; args: unknown; callId: string }];
+  tool_result: [data: { name: string; result: string; callId: string }];
   error: [error: Error];
 }
 
@@ -116,19 +118,26 @@ export class OpenAILLM extends EventEmitter<OpenAILLMEvents> {
       for (const tc of toolCalls) {
         if (signal.aborted) return;
 
+        const toolName = tc.function.name;
+        const toolArgs = JSON.parse(tc.function.arguments);
+
         logger.info('llm.tool_call', {
           sessionId: this.sessionId,
-          name: tc.function.name,
+          name: toolName,
           callId: tc.id,
         });
 
+        this.emit('tool_call', { name: toolName, args: toolArgs, callId: tc.id });
+
         const result = await executeTool({
-          name: tc.function.name,
-          arguments: JSON.parse(tc.function.arguments),
+          name: toolName,
+          arguments: toolArgs,
           sessionId: this.sessionId,
           callId: tc.id,
           bgQueue: this.bgQueue,
         });
+
+        this.emit('tool_result', { name: toolName, result, callId: tc.id });
 
         this.messages.push({
           role: 'tool',

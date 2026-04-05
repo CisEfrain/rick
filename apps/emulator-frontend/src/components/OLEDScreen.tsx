@@ -51,7 +51,7 @@ export function OLEDScreen({ oled }: { oled: OLEDState }) {
   return (
     <div style={{ background: '#030303', borderRadius: 8, padding: 6, display: 'inline-block', border: '1px solid #1a1a2e' }}>
       <canvas ref={ref} width={256} height={128} style={{ display: 'block', borderRadius: 3 }} />
-      <div style={{ textAlign: 'center', marginTop: 3, fontSize: 8, color: '#1a1a2e', fontFamily: 'monospace' }}>
+      <div style={{ textAlign: 'center', marginTop: 3, fontSize: 8, color: '#4a5568', fontFamily: 'monospace' }}>
         OLED SH1106 128×64 emulado (2x)
       </div>
     </div>
