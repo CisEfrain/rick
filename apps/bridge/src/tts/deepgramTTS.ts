@@ -39,7 +39,7 @@ export class DeepgramTTS {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Token ${config.deepgramApiKey}`,
+          Authorization: `${this.isV2 ? 'Bearer' : 'Token'} ${config.deepgramApiKey}`,
           'Content-Type': 'application/json',
         },
         body,
