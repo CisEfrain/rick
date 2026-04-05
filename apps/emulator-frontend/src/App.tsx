@@ -40,7 +40,7 @@ export function App() {
   const statusColors: Record<string, string> = { disconnected: '#e74c3c', connecting: '#f39c12', connected: '#2ecc71', error: '#e74c3c' };
   const statusLabels: Record<string, string> = { disconnected: 'Desconectado', connecting: 'Conectando...', connected: 'Conectado', error: 'Error' };
 
-  const sec: React.CSSProperties = { background: '#0a0a15', borderRadius: 8, border: '0.5px solid #1e1e3a', padding: 12, display: 'flex', flexDirection: 'column' };
+  const sec: React.CSSProperties = { background: '#0a0a15', borderRadius: 8, border: '0.5px solid #1e1e3a', padding: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 };
   const hd: React.CSSProperties = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4a5568', marginBottom: 8 };
 
   const connBtn = (c: string): React.CSSProperties => ({
