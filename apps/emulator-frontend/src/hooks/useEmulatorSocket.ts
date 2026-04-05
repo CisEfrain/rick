@@ -98,32 +98,37 @@ export function useEmulatorSocket() {
   const [state, dispatch] = useReducer(reducer, initial);
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const pendingBuffersRef = useRef<ArrayBuffer[]>([]);
-  const isPlayingRef = useRef(false);
+  const nextStartTimeRef = useRef(0);
+  const playbackDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const playNextAudio = useCallback(async () => {
-    if (isPlayingRef.current || pendingBuffersRef.current.length === 0) return;
-    isPlayingRef.current = true;
+  const stopPlayback = useCallback(() => {
+    if (playbackDoneTimerRef.current) {
+      clearTimeout(playbackDoneTimerRef.current);
+      playbackDoneTimerRef.current = null;
+    }
+    nextStartTimeRef.current = 0;
+    // Close AudioContext to stop all scheduled sources
+    audioCtxRef.current?.close();
+    audioCtxRef.current = null;
+    dispatch({ type: 'SET', v: { speakerActive: false } });
+  }, []);
 
+  const enqueueAudioChunk = useCallback(async (data: ArrayBuffer) => {
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext({ sampleRate: 16000 });
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') await ctx.resume();
 
-    const buffers = pendingBuffersRef.current.splice(0);
-    let totalLen = 0;
-    for (const b of buffers) totalLen += b.byteLength;
-    const merged = new Int16Array(totalLen / 2);
-    let offset = 0;
-    for (const b of buffers) {
-      const view = new Int16Array(b);
-      merged.set(view, offset);
-      offset += view.length;
+    // Cancel pending playback_done since new audio arrived
+    if (playbackDoneTimerRef.current) {
+      clearTimeout(playbackDoneTimerRef.current);
+      playbackDoneTimerRef.current = null;
     }
 
-    const float32 = new Float32Array(merged.length);
-    for (let i = 0; i < merged.length; i++) float32[i] = merged[i] / 32768;
+    const int16 = new Int16Array(data);
+    const float32 = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
 
     const audioBuffer = ctx.createBuffer(1, float32.length, 16000);
     audioBuffer.getChannelData(0).set(float32);
@@ -131,16 +136,23 @@ export function useEmulatorSocket() {
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(ctx.destination);
+
+    const startTime = Math.max(ctx.currentTime, nextStartTimeRef.current);
+    source.start(startTime);
+    nextStartTimeRef.current = startTime + audioBuffer.duration;
+
     source.onended = () => {
-      isPlayingRef.current = false;
-      if (pendingBuffersRef.current.length > 0) {
-        playNextAudio();
-      } else {
-        wsRef.current?.send(JSON.stringify({ type: 'playback_done' }));
-        dispatch({ type: 'SET', v: { speakerActive: false } });
+      const c = audioCtxRef.current;
+      if (!c) return;
+      // If this was the last scheduled chunk, wait briefly for more
+      if (c.currentTime >= nextStartTimeRef.current - 0.05) {
+        playbackDoneTimerRef.current = setTimeout(() => {
+          wsRef.current?.send(JSON.stringify({ type: 'playback_done' }));
+          dispatch({ type: 'SET', v: { speakerActive: false } });
+          playbackDoneTimerRef.current = null;
+        }, 300);
       }
     };
-    source.start();
   }, []);
 
   const handleMotor = useCallback((direction: string, duration: number) => {
@@ -174,9 +186,8 @@ export function useEmulatorSocket() {
 
     ws.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
-        pendingBuffersRef.current.push(event.data);
         dispatch({ type: 'SET', v: { speakerActive: true } });
-        if (!isPlayingRef.current) playNextAudio();
+        enqueueAudioChunk(event.data);
         return;
       }
 
@@ -217,9 +228,7 @@ export function useEmulatorSocket() {
           case 'playback_flush':
             break;
           case 'playback_stop':
-            pendingBuffersRef.current = [];
-            isPlayingRef.current = false;
-            dispatch({ type: 'SET', v: { speakerActive: false } });
+            stopPlayback();
             break;
         }
       } catch { /* ignore */ }
@@ -233,7 +242,7 @@ export function useEmulatorSocket() {
       dispatch({ type: 'SET', v: { wsState: 'disconnected' } });
       dispatch({ type: 'LOG', v: { level: 'warn', src: 'WS', msg: `Desconectado (code: ${e.code})` } });
     };
-  }, [playNextAudio, handleMotor]);
+  }, [enqueueAudioChunk, stopPlayback, handleMotor]);
 
   const disconnect = useCallback(() => {
     wsRef.current?.close();
@@ -252,5 +261,5 @@ export function useEmulatorSocket() {
     return () => { wsRef.current?.close(); audioCtxRef.current?.close(); };
   }, []);
 
-  return { state, dispatch, connect, disconnect, sendBinary, sendJson, handleMotor };
+  return { state, dispatch, connect, disconnect, sendBinary, sendJson, handleMotor, stopPlayback };
 }

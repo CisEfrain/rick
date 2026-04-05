@@ -31,7 +31,8 @@
       "Bash(npx tsc:*)",
       "Bash(chmod +x c:/Users/Nubiral/Documents/proyectos/rick/scripts/start-emulator.sh)",
       "Bash(node -e \"const { createClient } = require\\('@deepgram/sdk'\\); const d = createClient\\('test'\\); console.log\\('speak methods:', Object.getOwnPropertyNames\\(Object.getPrototypeOf\\(d.speak\\)\\).filter\\(m => m !== 'constructor'\\)\\);\")",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(find /c/Users/Nubiral/Documents/proyectos/rick/apps -name \"*.ts\" -type f -exec grep -l \"audio.chunk\\\\|AudioChunk\\\\|tts.*emit\" {} \\\\;)"
     ]
   }
 }

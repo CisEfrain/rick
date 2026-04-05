@@ -55,7 +55,7 @@ async function main() {
     sessionId: process.env.SESSION_ID || 'rick-001',
     token: process.env.INTERNAL_TOKEN || process.env.TOKEN || '',
     muteMicWhileSpeaking: (process.env.MUTE_MIC_WHILE_SPEAKING || 'true').toLowerCase() === 'true',
-    playbackDoneDelayMs: parseInt(process.env.PLAYBACK_DONE_DELAY_MS || '500', 10),
+    playbackDoneDelayMs: parseInt(process.env.PLAYBACK_DONE_DELAY_MS || '200', 10),
     pttMode: PLATFORM === 'emulator',
   });
 

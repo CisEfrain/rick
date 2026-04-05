@@ -36,7 +36,7 @@ export class DeepgramSTT extends EventEmitter<DeepgramSTTEvents> {
       sample_rate: 16000,
       channels: 1,
       interim_results: true,
-      utterance_end_ms: 1000,
+      utterance_end_ms: config.sttUtteranceEndMs,
       vad_events: true,
       smart_format: true,
       punctuate: true,

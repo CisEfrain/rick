@@ -38,7 +38,8 @@ Individual apps use `tsx` for dev and `tsc` for production builds. Output goes t
 - Format: PCM linear16, 16kHz sample rate, mono, raw (no container)
 - Client sends binary WebSocket frames (audio) and JSON text frames (`{type:"stop"}`)
 - Bridge sends binary frames (audio) and JSON frames (`{type:"audio.start"}`, `{type:"audio.end"}`)
-- Client mutes mic while agent speaks (`MUTE_MIC_WHILE_SPEAKING`)
+- TTS uses Deepgram WebSocket streaming (`speak.live()`) — audio chunks are forwarded to the client as they are synthesized, not accumulated
+- Client mutes mic while agent speaks (`MUTE_MIC_WHILE_SPEAKING`), except in emulator where PTT barge-in is supported (pressing mic during speech interrupts the agent)
 
 ### Key Flow: Bridge WebSocket Connection
 1. Client connects with `?sessionId=X&token=Y` query params
@@ -83,6 +84,7 @@ See `apps/bridge/.env.example` and `apps/node-client/.env.example`. Key bridge v
 - `STT_MODEL` — Deepgram STT model (default: nova-3)
 - `STT_LANGUAGE` — STT language (default: es)
 - `STT_IDLE_TIMEOUT_MS` — Idle timeout before disconnecting STT (default: 120000)
+- `STT_UTTERANCE_END_MS` — VAD silence threshold before utterance end (default: 500)
 - `LLM_MODEL` — OpenAI model (default: gpt-4o-mini)
 - `LLM_MAX_TOKENS` — Max response tokens (default: 300)
 - `LLM_TEMPERATURE` — LLM temperature (default: 0.8)

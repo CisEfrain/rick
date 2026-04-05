@@ -8,7 +8,7 @@ import { Conversation } from './components/Conversation';
 import { LogViewer } from './components/LogViewer';
 
 export function App() {
-  const { state, dispatch, connect, disconnect, sendBinary, sendJson, handleMotor } = useEmulatorSocket();
+  const { state, dispatch, connect, disconnect, sendBinary, sendJson, handleMotor, stopPlayback } = useEmulatorSocket();
   const [micLevel, setMicLevel] = useState(0);
   const [micOn, setMicOn] = useState(false);
   const [micCooling, setMicCooling] = useState(false);
@@ -20,6 +20,11 @@ export function App() {
   const toggleMic = useCallback(() => {
     if (micCooling) return;
     if (!micOn) {
+      // Barge-in: si Rick está hablando, interrumpir primero
+      if (state.speakerActive) {
+        stopPlayback();
+        sendJson({ type: 'stop' });
+      }
       setMicOn(true);
       sendJson({ type: 'ptt_press' });
     } else {
@@ -30,7 +35,7 @@ export function App() {
         setMicCooling(false);
       }, 1500);
     }
-  }, [micOn, micCooling, sendJson]);
+  }, [micOn, micCooling, sendJson, state.speakerActive, stopPlayback]);
 
   const onMotorMove = (direction: string) => {
     handleMotor(direction, 400);

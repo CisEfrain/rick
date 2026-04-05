@@ -202,6 +202,13 @@ export class Pipeline {
     }
   }
 
+  /** Ensure TTS WebSocket is connected, connecting if needed */
+  private async ensureTtsConnected(): Promise<void> {
+    if (this.tts.isConnected) return;
+    this.tts.connect();
+    await new Promise<void>((resolve) => this.tts.once('open', resolve));
+  }
+
   /** Process TTS sentences sequentially via streaming WebSocket */
   private async processTtsQueue(): Promise<void> {
     if (this.ttsProcessing) return;
@@ -209,10 +216,22 @@ export class Pipeline {
 
     this.ttsProcessing = true;
 
+    try {
+      await this.ensureTtsConnected();
+    } catch (err: any) {
+      logger.error('pipeline.tts_connect_error', {
+        sessionId: this.sessionId,
+        message: err?.message || String(err),
+      });
+      this.ttsProcessing = false;
+      return;
+    }
+
     while (this.ttsQueue.length > 0) {
       const sentence = this.ttsQueue.shift()!;
       try {
-        await this.tts.speak(sentence);
+        this.tts.sendText(sentence);
+        await this.tts.flush();
       } catch (err: any) {
         logger.error('pipeline.tts_error', {
           sessionId: this.sessionId,
@@ -235,8 +254,7 @@ export class Pipeline {
     if (this.ttsSentFirstAudio) {
       this.forwardJsonToClient({ type: 'audio.end' });
     }
-    // Cerrar WS de TTS — se reconecta solo en el próximo speak()
-    this.tts.close();
+    // Mantener WS de TTS abierto para la próxima respuesta
     this.setState(PipelineState.IDLE);
     this.resetIdleTimer();
   }
@@ -244,7 +262,13 @@ export class Pipeline {
   /** Speak a fallback message directly (for error recovery) */
   private async speakFallback(text: string): Promise<void> {
     this.ttsSentFirstAudio = false;
-    await this.tts.speak(text);
+    try {
+      await this.ensureTtsConnected();
+      this.tts.sendText(text);
+      await this.tts.flush();
+    } catch {
+      /* best-effort fallback */
+    }
     if (this.ttsSentFirstAudio) {
       this.forwardJsonToClient({ type: 'audio.end' });
     }
@@ -274,6 +298,7 @@ export class Pipeline {
     // Clear TTS pipeline
     this.accumulator.clear();
     this.ttsQueue = [];
+    this.tts.clear();
     this.llmResponseDone = true;
 
     // Send audio.end if we were speaking

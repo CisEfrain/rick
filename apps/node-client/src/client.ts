@@ -83,7 +83,14 @@ export class RickClient {
     // PTT: botón controla inicio/fin de captura
     this.button.on('press', async () => {
       logger.info('button.press', { state: this.state, pttMode: this.config.pttMode });
-      if (this.config.pttMode && this.state === 'IDLE') {
+      if (!this.config.pttMode) return;
+
+      // Barge-in: si Rick está hablando, interrumpir primero
+      if (this.state === 'SPEAKING') {
+        this.requestStop();
+      }
+
+      if (this.state === 'IDLE') {
         await this.audioIn.start();
         this.setState('LISTENING');
         this.display.notify('log', { level: 'info', src: 'MIC', msg: 'Captura de audio iniciada (PTT)' });
@@ -247,6 +254,15 @@ export class RickClient {
         this.ws.sendJson({ type: 'telemetry', ...data });
       } catch { /* ignore */ }
     }, 10000);
+  }
+
+  /** Interrupt current playback and notify bridge (for barge-in) */
+  public requestStop(): void {
+    this.audioOut.stop();
+    try {
+      this.ws.sendJson({ type: 'stop' });
+    } catch { /* ignore */ }
+    this.setState('IDLE');
   }
 
   async stop(): Promise<void> {
