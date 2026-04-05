@@ -1,4 +1,4 @@
-import { createClient } from '@deepgram/sdk';
+import { createClient, LiveTTSEvents } from '@deepgram/sdk';
 import { EventEmitter } from 'events';
 import { logger } from '../common/logger.js';
 import { config } from '../config/appConfig.js';
@@ -36,13 +36,12 @@ export class DeepgramTTS extends EventEmitter {
       container: 'none',
     });
 
-    this.connection.on('open', () => {
+    this.connection.on(LiveTTSEvents.Open, () => {
       this.connected = true;
       logger.info('tts.connected', { sessionId: this.sessionId });
     });
 
-    this.connection.on('audio', (data: any) => {
-      // data puede ser un Buffer, ArrayBuffer, o un objeto con .data
+    this.connection.on(LiveTTSEvents.Audio, (data: any) => {
       const buffer = Buffer.isBuffer(data)
         ? data
         : Buffer.from(data?.data ?? data);
@@ -51,26 +50,25 @@ export class DeepgramTTS extends EventEmitter {
       }
     });
 
-    this.connection.on('flushed', () => {
+    this.connection.on(LiveTTSEvents.Flushed, () => {
       this.flushResolve?.();
       this.flushResolve = null;
     });
 
-    this.connection.on('warning', (msg: any) => {
+    this.connection.on(LiveTTSEvents.Warning, (msg: any) => {
       logger.warn('tts.warning', { sessionId: this.sessionId, message: msg });
     });
 
-    this.connection.on('error', (err: any) => {
+    this.connection.on(LiveTTSEvents.Error, (err: any) => {
       logger.error('tts.error', {
         sessionId: this.sessionId,
         message: err?.message || String(err),
       });
-      // Resolve pending flush so the pipeline doesn't hang
       this.flushResolve?.();
       this.flushResolve = null;
     });
 
-    this.connection.on('close', () => {
+    this.connection.on(LiveTTSEvents.Close, () => {
       this.connected = false;
       this.connection = null;
       this.flushResolve?.();
@@ -79,25 +77,19 @@ export class DeepgramTTS extends EventEmitter {
     });
   }
 
-  /**
-   * Enviar texto para sintetizar. Retorna cuando todo el audio
-   * de esta oración fue recibido (flushed).
-   * Los chunks de audio se emiten como eventos "audio" durante la espera.
-   */
   async speak(text: string): Promise<void> {
     if (!this.connected) {
       this.connect();
-      // Esperar a que el WS se abra
       await new Promise<void>((resolve, reject) => {
         const onOpen = () => { cleanup(); resolve(); };
         const onError = (err: any) => { cleanup(); reject(err); };
         const cleanup = () => {
-          this.connection?.removeListener('open', onOpen);
-          this.connection?.removeListener('error', onError);
+          this.connection?.removeListener(LiveTTSEvents.Open, onOpen);
+          this.connection?.removeListener(LiveTTSEvents.Error, onError);
         };
         if (this.connected) { resolve(); return; }
-        this.connection?.on('open', onOpen);
-        this.connection?.on('error', onError);
+        this.connection?.on(LiveTTSEvents.Open, onOpen);
+        this.connection?.on(LiveTTSEvents.Error, onError);
       });
     }
 
