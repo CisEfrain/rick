@@ -64,7 +64,11 @@ export class RickClient {
 
     // Reproducción terminó → reactivar micrófono
     this.audioOut.on('finished', () => {
-      if (this.config.muteMicWhileSpeaking && !this.config.pttMode) {
+      if (this.config.pttMode) {
+        // En modo toggle/PTT: reactivar audioIn para que el audio del browser fluya
+        this.audioIn.start().catch(() => {});
+        this.setState('IDLE');
+      } else if (this.config.muteMicWhileSpeaking) {
         setTimeout(async () => {
           if (!this.audioOut.isPlaying()) {
             await this.audioIn.start();

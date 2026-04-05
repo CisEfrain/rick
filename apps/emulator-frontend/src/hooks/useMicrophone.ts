@@ -66,6 +66,7 @@ export function useMicrophone(
         streamRef.current = stream;
 
         const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
+        if (ctx.state === 'suspended') await ctx.resume();
         contextRef.current = ctx;
 
         const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });

@@ -16,7 +16,9 @@ export class DeepgramTTS {
       container: 'none',
     });
 
-    const url = `https://api.deepgram.com/v1/speak?${params}`;
+    // aura-2 models require /v2/speak endpoint
+    const version = config.ttsModel.startsWith('aura-2') ? 'v2' : 'v1';
+    const url = `https://api.deepgram.com/${version}/speak?${params}`;
 
     try {
       const response = await fetch(url, {

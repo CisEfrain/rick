@@ -3,24 +3,18 @@ interface MicButtonProps {
   level: number;
   speaking: boolean;
   rickState: string;
-  onPress: () => void;
-  onRelease: () => void;
+  onToggle: () => void;
 }
 
-export function MicButton({ active, level, speaking, rickState, onPress, onRelease }: MicButtonProps) {
-  const canPress = rickState === 'IDLE' && !speaking;
+export function MicButton({ active, level, speaking, rickState, onToggle }: MicButtonProps) {
   const r = Math.min(100, level) / 100;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
       <button
-        onMouseDown={canPress ? onPress : undefined}
-        onMouseUp={active ? onRelease : undefined}
-        onTouchStart={canPress ? (e) => { e.preventDefault(); onPress(); } : undefined}
-        onTouchEnd={active ? (e) => { e.preventDefault(); onRelease(); } : undefined}
+        onClick={onToggle}
         style={{
-          width: 88, height: 88, borderRadius: '50%', border: 'none',
-          cursor: canPress ? 'pointer' : 'default',
+          width: 88, height: 88, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: active
             ? 'radial-gradient(circle, #e74c3c, #c0392b)'
             : speaking
@@ -57,7 +51,7 @@ export function MicButton({ active, level, speaking, rickState, onPress, onRelea
         fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
         color: active ? '#e74c3c' : speaking ? '#2ecc71' : '#2a2a4a',
       }}>
-        {active ? 'Grabando...' : speaking ? 'Rick habla' : 'Push to talk'}
+        {active ? 'Mic activo — click para apagar' : speaking ? 'Rick habla' : 'Click para activar mic'}
       </span>
 
       {active && (

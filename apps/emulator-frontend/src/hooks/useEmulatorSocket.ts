@@ -109,6 +109,7 @@ export function useEmulatorSocket() {
 
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext({ sampleRate: 16000 });
     const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') await ctx.resume();
 
     const buffers = pendingBuffersRef.current.splice(0);
     let totalLen = 0;

@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useEmulatorSocket } from './hooks/useEmulatorSocket';
 import { useMicrophone } from './hooks/useMicrophone';
 import { OLEDScreen } from './components/OLEDScreen';
@@ -10,32 +10,19 @@ import { LogViewer } from './components/LogViewer';
 export function App() {
   const { state, dispatch, connect, disconnect, sendBinary, sendJson, handleMotor } = useEmulatorSocket();
   const [micLevel, setMicLevel] = useState(0);
+  const [micOn, setMicOn] = useState(false);
 
   const onLevel = useCallback((level: number) => setMicLevel(level), []);
 
-  useMicrophone(state.micActive, sendBinary, onLevel);
+  useMicrophone(micOn && state.wsState === 'connected', sendBinary, onLevel);
 
-  // PTT: Space key
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && state.rickState === 'IDLE' && !state.speakerActive) {
-        e.preventDefault();
-        sendJson({ type: 'ptt_press' });
-      }
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        sendJson({ type: 'ptt_release' });
-      }
-    };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-  }, [state.rickState, state.speakerActive, sendJson]);
-
-  const onMicPress = () => sendJson({ type: 'ptt_press' });
-  const onMicRelease = () => sendJson({ type: 'ptt_release' });
+  const toggleMic = useCallback(() => {
+    setMicOn(prev => {
+      const next = !prev;
+      sendJson({ type: next ? 'ptt_press' : 'ptt_release' });
+      return next;
+    });
+  }, [sendJson]);
 
   const onMotorMove = (direction: string) => {
     handleMotor(direction, 400);
@@ -113,12 +100,11 @@ export function App() {
         {/* Central: Mic + OLED */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 28, padding: '14px 0 10px', flexWrap: 'wrap' }}>
           <MicButton
-            active={state.micActive}
+            active={micOn}
             level={micLevel}
             speaking={state.speakerActive}
             rickState={state.rickState}
-            onPress={onMicPress}
-            onRelease={onMicRelease}
+            onToggle={toggleMic}
           />
           <OLEDScreen oled={state.oled} />
         </div>
