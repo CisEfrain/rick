@@ -1,113 +1,83 @@
-import { createClient, LiveTTSEvents } from '@deepgram/sdk';
+import { createClient } from '@deepgram/sdk';
 import { EventEmitter } from 'events';
 import { logger } from '../common/logger.js';
 import { config } from '../config/appConfig.js';
 
 /**
- * Deepgram TTS con streaming via SDK.
+ * Deepgram TTS via SDK REST.
  *
- * Usa deepgram.speak.live() — mismo patrón que deepgram.listen.live() del STT.
- * Mantiene un WebSocket abierto y envía texto + flush por oración.
- * Los chunks de audio llegan mientras Deepgram sintetiza.
+ * Usa deepgram.speak.request() que maneja auth y endpoints automáticamente.
+ * Sintetiza oración por oración — el pipeline ya envía cada oración
+ * al cliente apenas está lista (no espera la respuesta completa).
  *
  * Eventos emitidos:
- *   "audio" (buffer: Buffer) — chunk de audio PCM listo para forwardear
+ *   "audio" (buffer: Buffer) — audio PCM completo de una oración
  */
 export class DeepgramTTS extends EventEmitter {
   private sessionId: string;
-  private connection: any = null;
-  private connected = false;
-  private flushResolve: (() => void) | null = null;
+  private deepgram;
 
   constructor(sessionId: string) {
     super();
     this.sessionId = sessionId;
-  }
-
-  connect(): void {
-    if (this.connected) return;
-
-    const deepgram = createClient(config.deepgramApiKey);
-
-    this.connection = deepgram.speak.live({
-      model: config.ttsModel,
-      encoding: 'linear16',
-      sample_rate: config.ttsSampleRate,
-      container: 'none',
-    });
-
-    this.connection.on(LiveTTSEvents.Open, () => {
-      this.connected = true;
-      logger.info('tts.connected', { sessionId: this.sessionId });
-    });
-
-    this.connection.on(LiveTTSEvents.Audio, (data: any) => {
-      const buffer = Buffer.isBuffer(data)
-        ? data
-        : Buffer.from(data?.data ?? data);
-      if (buffer.length > 0) {
-        this.emit('audio', buffer);
-      }
-    });
-
-    this.connection.on(LiveTTSEvents.Flushed, () => {
-      this.flushResolve?.();
-      this.flushResolve = null;
-    });
-
-    this.connection.on(LiveTTSEvents.Warning, (msg: any) => {
-      logger.warn('tts.warning', { sessionId: this.sessionId, message: msg });
-    });
-
-    this.connection.on(LiveTTSEvents.Error, (err: any) => {
-      logger.error('tts.error', {
-        sessionId: this.sessionId,
-        message: err?.message || String(err),
-      });
-      this.flushResolve?.();
-      this.flushResolve = null;
-    });
-
-    this.connection.on(LiveTTSEvents.Close, () => {
-      this.connected = false;
-      this.connection = null;
-      this.flushResolve?.();
-      this.flushResolve = null;
-      logger.info('tts.disconnected', { sessionId: this.sessionId });
-    });
+    this.deepgram = createClient(config.deepgramApiKey);
   }
 
   async speak(text: string): Promise<void> {
-    if (!this.connected) {
-      this.connect();
-      await new Promise<void>((resolve, reject) => {
-        const onOpen = () => { cleanup(); resolve(); };
-        const onError = (err: any) => { cleanup(); reject(err); };
-        const cleanup = () => {
-          this.connection?.removeListener(LiveTTSEvents.Open, onOpen);
-          this.connection?.removeListener(LiveTTSEvents.Error, onError);
-        };
-        if (this.connected) { resolve(); return; }
-        this.connection?.on(LiveTTSEvents.Open, onOpen);
-        this.connection?.on(LiveTTSEvents.Error, onError);
+    try {
+      const response = await this.deepgram.speak.request(
+        { text },
+        {
+          model: config.ttsModel,
+          encoding: 'linear16',
+          sample_rate: config.ttsSampleRate,
+          container: 'none',
+        },
+      );
+
+      const stream = await response.getStream();
+      if (!stream) {
+        logger.error('tts.no_stream', { sessionId: this.sessionId, textLength: text.length });
+        return;
+      }
+
+      // Leer el stream y emitir como buffer
+      const reader = stream.getReader();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+      const merged = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const buffer = Buffer.from(merged.buffer, merged.byteOffset, merged.byteLength);
+
+      if (buffer.length > 0) {
+        this.emit('audio', buffer);
+        logger.info('tts.synthesized', {
+          sessionId: this.sessionId,
+          textLength: text.length,
+          audioBytes: buffer.length,
+        });
+      }
+    } catch (err: any) {
+      logger.error('tts.error', {
+        sessionId: this.sessionId,
+        message: err?.message || String(err),
+        textLength: text.length,
       });
     }
-
-    return new Promise<void>((resolve) => {
-      this.flushResolve = resolve;
-      this.connection.sendText(text);
-      this.connection.flush();
-      logger.info('tts.speak', { sessionId: this.sessionId, textLength: text.length });
-    });
   }
 
   close(): void {
-    this.connected = false;
-    this.flushResolve?.();
-    this.flushResolve = null;
-    try {
-      this.connection?.requestClose();
-    } catch { /* ignore */ }
-    this.connection = null;
+    // Noop — REST no mantiene conexión
   }
 }
