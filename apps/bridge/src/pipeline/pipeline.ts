@@ -58,6 +58,16 @@ export class Pipeline {
     // Give LLM access to background queue for async tool dispatch
     this.llm.bgQueue = this.bgQueue;
 
+    // TTS streaming: forward audio chunks to client as they arrive
+    this.tts.on('audio', (buffer: Buffer) => {
+      if (!this.ttsSentFirstAudio) {
+        this.ttsSentFirstAudio = true;
+        this.setState(PipelineState.SPEAKING);
+        this.forwardJsonToClient({ type: 'audio.start' });
+      }
+      this.forwardToClient(buffer);
+    });
+
     this.wireEvents();
     this.initSession();
 
@@ -181,7 +191,7 @@ export class Pipeline {
     }
   }
 
-  /** Process TTS sentences sequentially */
+  /** Process TTS sentences sequentially via streaming WebSocket */
   private async processTtsQueue(): Promise<void> {
     if (this.ttsProcessing) return;
     if (this.ttsQueue.length === 0) return;
@@ -190,19 +200,10 @@ export class Pipeline {
 
     while (this.ttsQueue.length > 0) {
       const sentence = this.ttsQueue.shift()!;
-
-      const audioBuffer = await this.tts.synthesize(sentence);
-
-      if (audioBuffer.length > 0) {
-        // Send audio.start before the first audio chunk of this response
-        if (!this.ttsSentFirstAudio) {
-          this.ttsSentFirstAudio = true;
-          this.setState(PipelineState.SPEAKING);
-          this.forwardJsonToClient({ type: 'audio.start' });
-        }
-
-        this.forwardToClient(audioBuffer);
-      }
+      // speak() envía texto + Flush al WS de Deepgram.
+      // Los chunks de audio llegan via evento "audio" (wired en constructor).
+      // speak() resuelve cuando Deepgram confirma Flushed.
+      await this.tts.speak(sentence);
     }
 
     this.ttsProcessing = false;
@@ -217,18 +218,19 @@ export class Pipeline {
     if (this.ttsSentFirstAudio) {
       this.forwardJsonToClient({ type: 'audio.end' });
     }
+    // Cerrar WS de TTS — se reconecta solo en el próximo speak()
+    this.tts.close();
     this.setState(PipelineState.IDLE);
     this.resetIdleTimer();
   }
 
   /** Speak a fallback message directly (for error recovery) */
   private async speakFallback(text: string): Promise<void> {
-    this.forwardJsonToClient({ type: 'audio.start' });
-    const audioBuffer = await this.tts.synthesize(text);
-    if (audioBuffer.length > 0) {
-      this.forwardToClient(audioBuffer);
+    this.ttsSentFirstAudio = false;
+    await this.tts.speak(text);
+    if (this.ttsSentFirstAudio) {
+      this.forwardJsonToClient({ type: 'audio.end' });
     }
-    this.forwardJsonToClient({ type: 'audio.end' });
     this.setState(PipelineState.IDLE);
   }
 
@@ -272,6 +274,7 @@ export class Pipeline {
     this.llm.abort();
     this.persistConversation();
     this.stt.disconnect();
+    this.tts.close();
   }
 
   // --- Internal helpers ---
