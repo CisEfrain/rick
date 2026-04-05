@@ -1,26 +1,21 @@
-import WebSocket from 'ws';
+import { createClient } from '@deepgram/sdk';
 import { EventEmitter } from 'events';
 import { logger } from '../common/logger.js';
 import { config } from '../config/appConfig.js';
 
 /**
- * Deepgram TTS con WebSocket streaming.
+ * Deepgram TTS con streaming via SDK.
  *
- * En vez de sintetizar cada oración completa con REST y esperar el buffer,
- * mantiene un WebSocket abierto y envía texto + Flush por oración.
- * Los chunks de audio llegan mientras Deepgram sintetiza → se forwardean
- * al cliente inmediatamente → menor latencia, especialmente en textos largos.
+ * Usa deepgram.speak.live() — mismo patrón que deepgram.listen.live() del STT.
+ * Mantiene un WebSocket abierto y envía texto + flush por oración.
+ * Los chunks de audio llegan mientras Deepgram sintetiza.
  *
- * Protocolo:
- *   → { type: "Speak", text: "..." }  enviar texto
- *   → { type: "Flush" }               pedir audio pendiente
- *   → { type: "Close" }               cerrar conexión
- *   ← binary                          chunk de audio PCM
- *   ← { type: "Flushed" }             todo el audio del flush fue enviado
+ * Eventos emitidos:
+ *   "audio" (buffer: Buffer) — chunk de audio PCM listo para forwardear
  */
 export class DeepgramTTS extends EventEmitter {
   private sessionId: string;
-  private ws: WebSocket | null = null;
+  private connection: any = null;
   private connected = false;
   private flushResolve: (() => void) | null = null;
 
@@ -29,131 +24,98 @@ export class DeepgramTTS extends EventEmitter {
     this.sessionId = sessionId;
   }
 
-  async connect(): Promise<void> {
+  connect(): void {
     if (this.connected) return;
 
-    const params = new URLSearchParams({
+    const deepgram = createClient(config.deepgramApiKey);
+
+    this.connection = deepgram.speak.live({
       model: config.ttsModel,
       encoding: 'linear16',
-      sample_rate: String(config.ttsSampleRate),
+      sample_rate: config.ttsSampleRate,
       container: 'none',
     });
 
-    const url = `wss://api.deepgram.com/v1/speak?${params}`;
+    this.connection.on('open', () => {
+      this.connected = true;
+      logger.info('tts.connected', { sessionId: this.sessionId });
+    });
 
-    return new Promise<void>((resolve, reject) => {
-      this.ws = new WebSocket(url, {
-        headers: { Authorization: `Token ${config.deepgramApiKey}` },
-      });
+    this.connection.on('audio', (data: any) => {
+      // data puede ser un Buffer, ArrayBuffer, o un objeto con .data
+      const buffer = Buffer.isBuffer(data)
+        ? data
+        : Buffer.from(data?.data ?? data);
+      if (buffer.length > 0) {
+        this.emit('audio', buffer);
+      }
+    });
 
-      this.ws.on('open', () => {
-        this.connected = true;
-        logger.info('tts.ws.connected', { sessionId: this.sessionId });
-        resolve();
-      });
+    this.connection.on('flushed', () => {
+      this.flushResolve?.();
+      this.flushResolve = null;
+    });
 
-      this.ws.on('message', (data: WebSocket.Data, isBinary: boolean) => {
-        if (isBinary) {
-          this.emit('audio', Buffer.from(data as ArrayBuffer));
-        } else {
-          try {
-            const msg = JSON.parse(data.toString());
-            if (msg.type === 'Flushed') {
-              this.flushResolve?.();
-              this.flushResolve = null;
-            } else if (msg.type === 'Warning') {
-              logger.warn('tts.ws.warning', { sessionId: this.sessionId, message: msg.warn_msg });
-            }
-          } catch { /* ignore */ }
-        }
-      });
+    this.connection.on('warning', (msg: any) => {
+      logger.warn('tts.warning', { sessionId: this.sessionId, message: msg });
+    });
 
-      this.ws.on('error', (err: Error) => {
-        logger.error('tts.ws.error', { sessionId: this.sessionId, message: err.message });
-        if (!this.connected) reject(err);
+    this.connection.on('error', (err: any) => {
+      logger.error('tts.error', {
+        sessionId: this.sessionId,
+        message: err?.message || String(err),
       });
+      // Resolve pending flush so the pipeline doesn't hang
+      this.flushResolve?.();
+      this.flushResolve = null;
+    });
 
-      this.ws.on('close', () => {
-        this.connected = false;
-        this.ws = null;
-        // Resolve any pending flush so the pipeline doesn't hang
-        this.flushResolve?.();
-        this.flushResolve = null;
-      });
+    this.connection.on('close', () => {
+      this.connected = false;
+      this.connection = null;
+      this.flushResolve?.();
+      this.flushResolve = null;
+      logger.info('tts.disconnected', { sessionId: this.sessionId });
     });
   }
 
   /**
    * Enviar texto para sintetizar. Retorna cuando todo el audio
-   * de esta oración fue recibido (Flushed).
+   * de esta oración fue recibido (flushed).
    * Los chunks de audio se emiten como eventos "audio" durante la espera.
    */
   async speak(text: string): Promise<void> {
-    if (!this.ws || !this.connected) {
-      await this.connect();
+    if (!this.connected) {
+      this.connect();
+      // Esperar a que el WS se abra
+      await new Promise<void>((resolve, reject) => {
+        const onOpen = () => { cleanup(); resolve(); };
+        const onError = (err: any) => { cleanup(); reject(err); };
+        const cleanup = () => {
+          this.connection?.removeListener('open', onOpen);
+          this.connection?.removeListener('error', onError);
+        };
+        if (this.connected) { resolve(); return; }
+        this.connection?.on('open', onOpen);
+        this.connection?.on('error', onError);
+      });
     }
 
     return new Promise<void>((resolve) => {
       this.flushResolve = resolve;
-      this.ws!.send(JSON.stringify({ type: 'Speak', text }));
-      this.ws!.send(JSON.stringify({ type: 'Flush' }));
-
+      this.connection.sendText(text);
+      this.connection.flush();
       logger.info('tts.speak', { sessionId: this.sessionId, textLength: text.length });
     });
   }
 
-  /**
-   * Fallback REST para casos donde el WS no está disponible.
-   * Retorna el buffer completo (sin streaming).
-   */
-  async synthesize(text: string): Promise<Buffer> {
-    const params = new URLSearchParams({
-      model: config.ttsModel,
-      encoding: 'linear16',
-      sample_rate: String(config.ttsSampleRate),
-      container: 'none',
-    });
-
-    const isV2 = config.ttsModel.startsWith('aura-2');
-    const version = isV2 ? 'v2' : 'v1';
-    const url = `https://api.deepgram.com/${version}/speak?${params}`;
-    const body = isV2
-      ? JSON.stringify({ text, model: config.ttsModel })
-      : JSON.stringify({ text });
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `${isV2 ? 'Bearer' : 'Token'} ${config.deepgramApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body,
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => '');
-        throw new Error(`TTS HTTP ${response.status}: ${response.statusText} — ${errorBody}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer);
-    } catch (err: any) {
-      logger.error('tts.error', { sessionId: this.sessionId, message: err.message, textLength: text.length });
-      return Buffer.alloc(0);
-    }
-  }
-
   close(): void {
-    if (this.ws) {
-      try {
-        if (this.connected) this.ws.send(JSON.stringify({ type: 'Close' }));
-      } catch { /* ignore */ }
-      this.ws.close();
-      this.ws = null;
-    }
     this.connected = false;
     this.flushResolve?.();
     this.flushResolve = null;
+    try {
+      this.connection?.requestClose();
+    } catch { /* ignore */ }
+    this.connection = null;
   }
 }
