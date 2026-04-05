@@ -10,11 +10,11 @@ The project is in Spanish (prompts, agent persona, function names like `recordar
 
 ## Monorepo Structure
 
-npm workspaces monorepo. Three apps under `apps/`:
+npm workspaces monorepo. Two workspaces + one standalone app under `apps/`:
 
-- **`apps/bridge`** — Express + WebSocket server. Creates a `Pipeline` per client that orchestrates STT→LLM→TTS, manages memory (JSON files), and handles function calls via OpenAI tool calling. Deployed on Railway.
-- **`apps/node-client`** — Shared client for Raspberry Pi and emulator. Uses hardware abstraction interfaces (`interfaces/`) with platform-specific adapters (`adapters/raspi/` and `adapters/emulator/`). `PLATFORM` env var selects adapters at startup. Business logic in `client.ts` is platform-agnostic.
-- **`apps/emulator-frontend`** — React + Vite browser UI for the emulator. Connects to Node Client via WebSocket (port 3001). Captures mic audio with `getUserMedia`, plays back TTS with Web Audio API, and shows OLED/motors/logs.
+- **`apps/bridge`** — (workspace) Express + WebSocket server. Creates a `Pipeline` per client that orchestrates STT→LLM→TTS, manages memory (JSON files), and handles function calls via OpenAI tool calling. Deployed on Railway.
+- **`apps/node-client`** — (workspace) Shared client for Raspberry Pi and emulator. Uses hardware abstraction interfaces (`interfaces/`) with platform-specific adapters (`adapters/raspi/` and `adapters/emulator/`). `PLATFORM` env var selects adapters at startup. Business logic in `client.ts` is platform-agnostic.
+- **`apps/emulator-frontend`** — (standalone, not a workspace) React + Vite browser UI for the emulator. Installed separately with `cd apps/emulator-frontend && npm install`. Connects to Node Client via WebSocket (port 3001). Captures mic audio with `getUserMedia`, plays back TTS with Web Audio API, and shows OLED/motors/conversation/logs.
 
 ## Common Commands
 
@@ -86,7 +86,7 @@ See `apps/bridge/.env.example` and `apps/node-client/.env.example`. Key bridge v
 - `LLM_MODEL` — OpenAI model (default: gpt-4o-mini)
 - `LLM_MAX_TOKENS` — Max response tokens (default: 300)
 - `LLM_TEMPERATURE` — LLM temperature (default: 0.8)
-- `TTS_MODEL` — Deepgram TTS voice (default: aura-2-es-alvaro)
+- `TTS_MODEL` — Deepgram TTS voice (default: aura-2-alvaro-es)
 - `TTS_SAMPLE_RATE` — TTS audio sample rate (default: 16000)
 - `WEATHER_API_KEY` — OpenWeatherMap API key for `obtener_clima` tool (optional)
 - `MEMORY_DIR` — Path for memory JSON files (default: `data/memory/`)
