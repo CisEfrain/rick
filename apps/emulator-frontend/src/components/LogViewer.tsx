@@ -10,22 +10,31 @@ const LEVEL_COLORS: Record<string, string> = {
 
 export function LogViewer({ logs }: { logs: LogEntry[] }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
-    <div style={{
-      height: '100%', minHeight: 160, overflowY: 'auto',
-      fontFamily: 'monospace', fontSize: 10, lineHeight: 1.8,
-      padding: 8, background: '#050510', borderRadius: 6, border: '0.5px solid #14142a',
-    }}>
+    <div
+      ref={containerRef}
+      style={{
+        flex: 1, overflowY: 'auto',
+        fontFamily: 'monospace', fontSize: 10, lineHeight: 1.8,
+        padding: 8, background: '#050510', borderRadius: 6, border: '0.5px solid #1e1e3a',
+      }}
+    >
       {logs.map((l, i) => (
         <div key={i}>
-          <span style={{ color: '#14142a' }}>{new Date(l.ts).toLocaleTimeString('es-AR')}</span>{' '}
-          <span style={{ color: LEVEL_COLORS[l.level] || '#2a2a4a' }}>[{l.src}]</span>{' '}
-          <span style={{ color: LEVEL_COLORS[l.level] || '#4a5568' }}>{l.msg}</span>
+          <span style={{ color: '#4a5568' }}>{new Date(l.ts).toLocaleTimeString('es-AR')}</span>{' '}
+          <span style={{ color: LEVEL_COLORS[l.level] || '#6b7280' }}>[{l.src}]</span>{' '}
+          <span style={{ color: LEVEL_COLORS[l.level] || '#8892a4' }}>{l.msg}</span>
         </div>
       ))}
-      {!logs.length && <div style={{ color: '#14142a' }}>Conectá al Node Client para ver logs...</div>}
+      {!logs.length && <div style={{ color: '#4a5568' }}>Conectá al Node Client para ver logs...</div>}
       <div ref={ref} />
     </div>
   );

@@ -11,18 +11,26 @@ export function App() {
   const { state, dispatch, connect, disconnect, sendBinary, sendJson, handleMotor } = useEmulatorSocket();
   const [micLevel, setMicLevel] = useState(0);
   const [micOn, setMicOn] = useState(false);
+  const [micCooling, setMicCooling] = useState(false);
 
   const onLevel = useCallback((level: number) => setMicLevel(level), []);
 
   useMicrophone(micOn && state.wsState === 'connected', sendBinary, onLevel);
 
   const toggleMic = useCallback(() => {
-    setMicOn(prev => {
-      const next = !prev;
-      sendJson({ type: next ? 'ptt_press' : 'ptt_release' });
-      return next;
-    });
-  }, [sendJson]);
+    if (micCooling) return;
+    if (!micOn) {
+      setMicOn(true);
+      sendJson({ type: 'ptt_press' });
+    } else {
+      sendJson({ type: 'ptt_release' });
+      setMicCooling(true);
+      setTimeout(() => {
+        setMicOn(false);
+        setMicCooling(false);
+      }, 1500);
+    }
+  }, [micOn, micCooling, sendJson]);
 
   const onMotorMove = (direction: string) => {
     handleMotor(direction, 400);
@@ -32,8 +40,8 @@ export function App() {
   const statusColors: Record<string, string> = { disconnected: '#e74c3c', connecting: '#f39c12', connected: '#2ecc71', error: '#e74c3c' };
   const statusLabels: Record<string, string> = { disconnected: 'Desconectado', connecting: 'Conectando...', connected: 'Conectado', error: 'Error' };
 
-  const sec: React.CSSProperties = { background: '#0a0a15', borderRadius: 8, border: '0.5px solid #14142a', padding: 12 };
-  const hd: React.CSSProperties = { fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: '#1e1e3a', marginBottom: 8 };
+  const sec: React.CSSProperties = { background: '#0a0a15', borderRadius: 8, border: '0.5px solid #1e1e3a', padding: 12 };
+  const hd: React.CSSProperties = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: '#4a5568', marginBottom: 8 };
 
   const connBtn = (c: string): React.CSSProperties => ({
     padding: '5px 14px', borderRadius: 6, border: `1px solid ${c}55`,
@@ -44,23 +52,23 @@ export function App() {
     <div style={{ minHeight: '100vh', background: '#060610', color: '#b0b8c8', fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
 
       {/* Title bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid #14142a' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid #1e1e3a' }}>
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
           background: statusColors[state.wsState],
           boxShadow: `0 0 6px ${statusColors[state.wsState]}55`,
         }} />
         <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, color: '#e2e8f0' }}>RICK</span>
-        <span style={{ fontSize: 9, color: '#1e1e3a' }}>EMULADOR DE RASPBERRY PI</span>
+        <span style={{ fontSize: 9, color: '#4a5568' }}>EMULADOR DE RASPBERRY PI</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 9, color: '#1e1e3a', padding: '2px 8px', border: '0.5px solid #14142a', borderRadius: 4 }}>
+        <span style={{ fontSize: 9, color: '#8892a4', padding: '2px 8px', border: '0.5px solid #1e1e3a', borderRadius: 4 }}>
           {state.rickState}
         </span>
-        <span style={{ fontSize: 9, color: '#14142a' }}>v2.0</span>
+        <span style={{ fontSize: 9, color: '#4a5568' }}>v2.0</span>
       </div>
 
       {/* Connection bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#08080f', borderBottom: '0.5px solid #14142a' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#08080f', borderBottom: '0.5px solid #1e1e3a' }}>
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
           background: statusColors[state.wsState],
@@ -90,10 +98,10 @@ export function App() {
       </div>
 
       {/* Info banner */}
-      <div style={{ padding: '6px 16px', fontSize: 10, color: '#2a2a4a', borderBottom: '0.5px solid #0d0d1a', lineHeight: 1.6 }}>
+      <div style={{ padding: '6px 16px', fontSize: 10, color: '#6b7280', borderBottom: '0.5px solid #0d0d1a', lineHeight: 1.6 }}>
         Este emulador reemplaza la Raspberry Pi. Se conecta al Node Client que se conecta al Bridge real.
         El pipeline de voz (Deepgram STT → GPT → Deepgram TTS) es real.
-        Presioná <span style={{ color: '#6c5ce7', fontWeight: 600 }}>Space</span> o el botón para hablar.
+        Clickeá el botón del micrófono para activar/desactivar.
       </div>
 
       <div style={{ padding: 12 }}>
@@ -113,8 +121,8 @@ export function App() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
 
           {/* Conversation */}
-          <div style={sec}>
-            <div style={hd}>Transcripción de la conversación</div>
+          <div style={{ ...sec, display: 'flex', flexDirection: 'column', maxHeight: 340 }}>
+            <div style={hd}>Conversación</div>
             <Conversation messages={state.messages} />
           </div>
 
@@ -125,14 +133,14 @@ export function App() {
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
               <MotorControls onMove={onMotorMove} />
             </div>
-            <div style={{ marginTop: 6, fontSize: 9, color: '#14142a', textAlign: 'center' }}>
-              Controles manuales — en producción, Rick se mueve solo vía function calls
+            <div style={{ marginTop: 6, fontSize: 9, color: '#4a5568', textAlign: 'center' }}>
+              Controles manuales — en producción Rick se mueve via function calls
             </div>
           </div>
 
           {/* Logs */}
-          <div style={sec}>
-            <div style={hd}>Logs del Node Client</div>
+          <div style={{ ...sec, display: 'flex', flexDirection: 'column', maxHeight: 340 }}>
+            <div style={hd}>Logs</div>
             <LogViewer logs={state.logs} />
           </div>
         </div>

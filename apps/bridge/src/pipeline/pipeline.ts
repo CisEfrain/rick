@@ -76,14 +76,16 @@ export class Pipeline {
   }
 
   private wireEvents(): void {
-    // STT → partial transcript (for future OLED feedback)
+    // STT → partial transcript
     this.stt.on('partial', (text) => {
       this.setState(PipelineState.LISTENING);
+      this.forwardJsonToClient({ type: 'transcript', text });
     });
 
     // STT → final utterance → send to LLM
     this.stt.on('utterance', async (text) => {
       this.setState(PipelineState.PROCESSING);
+      this.forwardJsonToClient({ type: 'utterance', text });
       this.currentMessages.push({ role: 'user', content: text });
 
       // Reset TTS state for new response
@@ -128,6 +130,7 @@ export class Pipeline {
 
       if (fullText) {
         this.currentMessages.push({ role: 'assistant', content: fullText });
+        this.forwardJsonToClient({ type: 'response_text', text: fullText });
       }
 
       // If no sentences were queued (e.g. empty response), go back to idle

@@ -92,8 +92,15 @@ export class RickClient {
 
     this.button.on('release', async () => {
       if (this.config.pttMode && this.audioIn.isActive()) {
-        await this.audioIn.stop();
-        this.display.notify('log', { level: 'info', src: 'MIC', msg: 'Captura de audio detenida (PTT)' });
+        logger.info('button.release', { message: 'Delaying mic stop 1.5s for utterance detection' });
+        setTimeout(async () => {
+          await this.audioIn.stop();
+          this.display.notify('log', { level: 'info', src: 'MIC', msg: 'Captura detenida' });
+          // Si Deepgram no detectó utterance, volver a IDLE
+          if (this.state === 'LISTENING') {
+            this.setState('IDLE');
+          }
+        }, 1500);
       }
     });
 
